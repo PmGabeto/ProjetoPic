@@ -6,18 +6,22 @@ import com.example.df.backend.entities.OcorrenciaMapa
 import com.example.df.backend.enums.StatusOcorrencia
 import com.example.df.backend.enums.TipoProblema
 import com.example.df.backend.services.OcorrenciaService
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
+@Tag(name = "2. Ocorrências (Cidadão)", description = "Gestão de denúncias e problemas urbanos reportados pelos usuários")
 @RestController
-@RequestMapping("/api/tokens")
+@RequestMapping("/api/ocorrencia")
 class OcorrenciaController(
     private val service: OcorrenciaService
 ) {
 
     // 1. CRIAR (POST)
+    @Operation(summary = "Criar nova ocorrência", description = "Registra um problema urbano no mapa. Requer coordenadas geográficas.")
     @PostMapping
     fun criarOcorrencia(@Valid @RequestBody dto: CriarOcorrenciaDTO): ResponseEntity<Any> {
         return try {
@@ -28,7 +32,8 @@ class OcorrenciaController(
         }
     }
 
-    // 2. LISTAR COM FILTROS E ÁREA (GET Inteligente) - FALTAVA ESTE!
+    // 2. LISTAR COM FILTROS E ÁREA (GET Inteligente)
+    @Operation(summary = "Listar ocorrências com filtros", description = "Filtra por categoria, status ou dentro de um quadrante do mapa (lat/lon).")
     @GetMapping
     fun listarTodos(
         @RequestParam(required = false) categoria: TipoProblema?,
@@ -42,7 +47,8 @@ class OcorrenciaController(
         return ResponseEntity.ok(lista)
     }
 
-    // 3. BUSCAR POR ID (GET /id) - FALTAVA ESTE!
+    // 3. BUSCAR POR ID (GET /id)
+    @Operation(summary = "Obter detalhes da ocorrência", description = "Retorna os dados completos de um reporte específico pelo ID.")
     @GetMapping("/{id}")
     fun buscarPorId(@PathVariable id: Long): ResponseEntity<Any> {
         return try {
@@ -54,6 +60,7 @@ class OcorrenciaController(
     }
 
     // 4. ATUALIZAR STATUS (PATCH)
+    @Operation(summary = "Atualizar status (ADMIN)", description = "Altera o estado da ocorrência (Ex: PENDENTE para EM_ANALISE).")
     @PatchMapping("/{id}/status")
     fun atualizarStatus(
         @PathVariable id: Long,
@@ -67,7 +74,7 @@ class OcorrenciaController(
         }
     }
 
-    // 5. DELETAR (DELETE) - FALTAVA ESTE!
+    // 5. DELETAR (DELETE)
     @DeleteMapping("/{id}")
     fun deletar(@PathVariable id: Long): ResponseEntity<Any> {
         return try {

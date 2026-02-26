@@ -21,7 +21,7 @@ class SwaggerConfig : WebMvcConfigurer { // Adicionamos a interface aqui
         return OpenAPI()
             .info(
                 Info()
-                    .title("VigiaDF")
+                    .title("VigiaDF - Sistema de Gestão e Fiscalização Urbana")
                     .version("0.1")
                     .description("""
                         API para gerenciamento de tokens no mapa (problemas urbanos e obras públicas).

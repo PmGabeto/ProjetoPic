@@ -1,6 +1,8 @@
 package com.example.df.backend.controllers
 
 import com.example.df.backend.services.FotoService
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.core.io.Resource
 import org.springframework.http.HttpHeaders
@@ -10,16 +12,17 @@ import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.servlet.HandlerMapping
 import java.nio.file.Files
-
+@Tag(name = "6. Gestão de Fotos", description = "Endpoints para upload e visualização pública de arquivos de mídia")
 @RestController
-@RequestMapping("/api") // Mudei a base para /api para ficar organizado
+@RequestMapping("/api/foto") // Mudei a base para /api para ficar organizado
 class FotoController(
     private val fotoService: FotoService
 ) {
 
     // 1. UPLOAD DE OCORRÊNCIA (TOKEN)
     // Rota: POST /api/tokens/{id}/fotos
-    @PostMapping("/tokens/{id}/fotos", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+    @Operation(summary = "Upload de foto de ocorrência", description = "Vincula uma imagem a uma denúncia existente via ID.")
+    @PostMapping("/tokens/{id}", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
     fun uploadFotoOcorrencia(
         @PathVariable id: Long,
         @RequestParam("file") file: MultipartFile
@@ -37,7 +40,8 @@ class FotoController(
 
     // 2. VISUALIZAR QUALQUER FOTO (Perfil ou Ocorrência)
     // Rota: GET /api/public/fotos/perfis/123.jpg ou /api/public/fotos/ocorrencias/abc.jpg
-    @GetMapping("/public/fotos/**")
+    @Operation(summary = "Visualizar foto (Público)", description = "Recupera o arquivo de imagem do servidor para exibição no App/Web.")
+    @GetMapping("/publico/**")
     fun visualizarFoto(request: HttpServletRequest): ResponseEntity<Resource> {
         // O "/**" permite passar barras na URL
 
