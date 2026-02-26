@@ -1,0 +1,5 @@
+package com.example.df.backend.enums
+
+enum class StatusProposta {
+    EM_DISCUSSAO, EM_ANALISE, EM_REFINAMENTO, EM_VOTACAO, APURACAO, APROVADA, REJEITADA_INVIAVEL, REJEITADA_POPULAR
+}
