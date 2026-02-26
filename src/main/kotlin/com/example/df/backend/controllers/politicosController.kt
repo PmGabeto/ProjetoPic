@@ -1,8 +1,8 @@
 package com.example.df.backend.controllers
 
-import com.example.df.backend.dtos.AtualizarPoliticoDTO
-import com.example.df.backend.dtos.CriarPoliticoDTO
-import com.example.df.backend.dtos.CriarProposicaoDTO
+import com.example.df.backend.dtos.*
+import com.example.df.backend.entities.Politico
+import com.example.df.backend.entities.Proposicao
 import com.example.df.backend.enums.StatusPolitico
 import com.example.df.backend.services.PoliticoService
 import io.swagger.v3.oas.annotations.Operation
@@ -11,88 +11,54 @@ import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
-@Tag(name = "4. Políticos", description = "Gestão de representantes públicos, biografias e proposições (leis)")
+
+@Tag(name = "4. Políticos", description = "Gestão de representantes públicos e suas proposições")
 @RestController
 @RequestMapping("/api/politicos")
-class PoliticoController(
-    private val service: PoliticoService
-) {
+class PoliticoController(private val service: PoliticoService) {
 
-    // 1. LISTAR TODOS (Resumido)
-    // GET /api/politicos
-    @Operation(summary = "Listar todos os políticos", description = "Retorna a lista resumida de todos os representantes cadastrados.")
+    @Operation(summary = "Listar todos os políticos")
     @GetMapping
-    fun listarTodos(): ResponseEntity<Any> {
-        val lista = service.listarTodos()
-        return ResponseEntity.ok(lista)
+    fun listarTodos(): ResponseEntity<List<PoliticoResumoDTO>> {
+        return ResponseEntity.ok(service.listarTodos())
     }
 
-    // 2. BUSCAR DETALHES (Com leis e biografia)
-    // GET /api/politicos/1
-    @Operation(summary = "Perfil detalhado do político", description = "Retorna biografia completa e todas as leis/proposições vinculadas.")
+    @Operation(summary = "Perfil detalhado do político")
     @GetMapping("/{id}")
-    fun buscarPorId(@PathVariable id: Long): ResponseEntity<Any> {
-        return try {
-            val politicoDetalhado = service.buscarPorId(id)
-            ResponseEntity.ok(politicoDetalhado)
-        } catch (e: IllegalArgumentException) {
-            // Retorna 404 se não achar
-            ResponseEntity.status(HttpStatus.NOT_FOUND).body(mapOf("erro" to e.message))
-        }
+    fun buscarPorId(@PathVariable id: Long): ResponseEntity<PoliticoDetalheDTO> {
+        return ResponseEntity.ok(service.buscarPorId(id))
     }
 
-    // 3. CADASTRAR NOVO POLÍTICO
-    // POST /api/politicos
-    @Operation(summary = "Cadastrar político (ADMIN)", description = "Adiciona um novo representante ao sistema.")
+    @Operation(summary = "Cadastrar político (ADMIN)")
     @PostMapping
-    fun criarPolitico(@RequestBody @Valid dto: CriarPoliticoDTO): ResponseEntity<Any> {
-        val novoPolitico = service.criarPolitico(dto)
-        return ResponseEntity.status(HttpStatus.CREATED).body(novoPolitico)
+    fun criarPolitico(@RequestBody @Valid dto: CriarPoliticoDTO): ResponseEntity<Politico> {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.criarPolitico(dto))
     }
 
-    // 4. ADICIONAR PROPOSIÇÃO (Lei) A UM POLÍTICO
-    // POST /api/politicos/1/proposicoes
-    @Operation(summary = "Adicionar nova lei/proposição", description = "Vincula uma nova proposição legislativa ao perfil do político.")
+    @Operation(summary = "Adicionar nova lei/proposição")
     @PostMapping("/{id}/proposicoes")
     fun adicionarProposicao(
         @PathVariable id: Long,
         @RequestBody @Valid dto: CriarProposicaoDTO
-    ): ResponseEntity<Any> {
-        return try {
-            val proposicaoSalva = service.adicionarProposicao(id, dto)
-            ResponseEntity.status(HttpStatus.CREATED).body(proposicaoSalva)
-        } catch (e: IllegalArgumentException) {
-            ResponseEntity.status(HttpStatus.BAD_REQUEST).body(mapOf("erro" to e.message))
-        }
+    ): ResponseEntity<Proposicao> {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.adicionarProposicao(id, dto))
     }
-    // 5. ATUALIZAR DADOS (PUT)
-    @Operation(summary = "Atualizar dados básicos", description = "Edita informações como nome, partido e biografia.")
+
+    @Operation(summary = "Atualizar dados básicos")
     @PutMapping("/{id}")
     fun atualizarDados(
         @PathVariable id: Long,
         @RequestBody dto: AtualizarPoliticoDTO
-    ): ResponseEntity<Any> {
-        return try {
-            val atualizado = service.atualizarPolitico(id, dto)
-            ResponseEntity.ok(atualizado)
-        } catch (e: IllegalArgumentException) {
-            ResponseEntity.notFound().build()
-        }
+    ): ResponseEntity<Politico> {
+        return ResponseEntity.ok(service.atualizarPolitico(id, dto))
     }
 
-    // 6. ALTERAR STATUS (PATCH)
-    // Ex: PATCH /api/politicos/1/status?novoStatus=INATIVO
-    @Operation(summary = "Alterar status do político", description = "Define se o político está ATIVO ou INATIVO no sistema.")
+    @Operation(summary = "Alterar status do político")
     @PatchMapping("/{id}/status")
     fun alterarStatus(
         @PathVariable id: Long,
-        @RequestParam novoStatus: StatusPolitico
-    ): ResponseEntity<Any> {
-        return try {
-            val atualizado = service.alterarStatus(id, novoStatus)
-            ResponseEntity.ok(atualizado)
-        } catch (e: IllegalArgumentException) {
-            ResponseEntity.notFound().build()
-        }
+        @RequestBody novoStatus: StatusPolitico // Alterado para Body para evitar ambiguidade
+    ): ResponseEntity<Politico> {
+        return ResponseEntity.ok(service.alterarStatus(id, novoStatus))
     }
 }

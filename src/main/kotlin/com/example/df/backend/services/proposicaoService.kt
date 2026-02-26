@@ -1,60 +1,111 @@
 package com.example.df.backend.services
 
-import com.example.df.backend.dtos.NovoHistoricoDTO
-import com.example.df.backend.dtos.ProposicaoResumoDTO
-import com.example.df.backend.entities.ProposicaoHistorico
-import com.example.df.backend.enums.TipoVinculacao
-import com.example.df.backend.repositories.HistoricoRepository
-import com.example.df.backend.repositories.ProposicaoRepository
+import com.example.df.backend.dtos.*
+import com.example.df.backend.entities.*
+import com.example.df.backend.repositories.*
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
 class ProposicaoService(
     private val proposicaoRepo: ProposicaoRepository,
-    private val historicoRepo: HistoricoRepository
+    private val temaRepo: TemaRepository,
+    private val historicoRepo: HistoricoRepository,
+    private val documentoRepo: DocumentoRepository
 ) {
 
-    /**
-     * Adiciona uma nova tramitação e, opcionalmente, atualiza o status principal da Lei.
-     * @Transactional garante que: ou salva tudo (histórico + status novo) ou não salva nada se der erro.
-     */
+    @Transactional(readOnly = true)
+    fun listarTodas(): List<ProposicaoResumoDTO> {
+        return proposicaoRepo.findAll().map { prop ->
+            ProposicaoResumoDTO(
+                id = prop.id!!,
+                idExterno = prop.idExterno,
+                tipo = TipoProposicaoDTO(prop.tipo.sigla, prop.tipo.nome, prop.tipo.descricaoPedagogica),
+                numero = prop.numeroProcesso,
+                titulo = prop.titulo,
+                tema = prop.temas.map { TemaDTO(it.id, it.nome) }, // Mapeia lista de temas
+                status = prop.statusTramitacao ?: "Em tramitação",
+                data = prop.dataApresentacao,
+                minhaVinculacao = null
+            )
+        }
+    }
+
+    @Transactional(readOnly = true)
+    fun buscarDetalhe(id: Long): ProposicaoDetalheDTO {
+        val prop = proposicaoRepo.findById(id)
+            .orElseThrow { IllegalArgumentException("Proposição não encontrada com ID: $id") }
+
+        return ProposicaoDetalheDTO(
+            id = prop.id!!,
+            idExterno = prop.idExterno,
+            tipo = TipoProposicaoDTO(prop.tipo.sigla, prop.tipo.nome, prop.tipo.descricaoPedagogica),
+            numeroProcesso = prop.numeroProcesso,
+            numeroDefinitivo = prop.numeroDefinitivo,
+            titulo = prop.titulo,
+            ementa = prop.ementa,
+            statusTramitacao = prop.statusTramitacao,
+            regiaoAdministrativa = prop.regiaoAdministrativa,
+            regimeUrgencia = prop.regimeUrgencia,
+            dataApresentacao = prop.dataApresentacao,
+            dataLimite = prop.dataLimite,
+            tema = prop.temas.map { TemaDTO(it.id, it.nome) }, // Mapeia lista de temas
+
+            documentos = prop.documentos.map { doc ->
+                DocumentoDTO(doc.idExterno, doc.tipoDocumento, doc.dataDocumento, doc.linkArquivo, doc.autorDocumento)
+            },
+
+            historicos = prop.historicos.sortedByDescending { it.dataEvento }.map { hist ->
+                HistoricoDTO(hist.dataEvento, hist.faseTramitacao, hist.unidadeResponsavel, hist.descricao)
+            },
+
+            autores = prop.autores.map { autoria ->
+                PoliticoResumoDTO(
+                    id = autoria.politico.id!!,
+                    idExterno = autoria.politico.idExterno,
+                    nome = autoria.politico.nomeUrna ?: autoria.politico.nomeCompleto,
+                    partido = autoria.politico.partidoAtual,
+                    status = autoria.politico.status,
+                    foto = autoria.politico.urlFoto
+                )
+            }
+        )
+    }
+
     @Transactional
-    fun adicionarHistorico(idProposicao: Long, dto: NovoHistoricoDTO): ProposicaoResumoDTO {
+    fun adicionarHistorico(idProposicao: Long, dto: NovoHistoricoDTO): ProposicaoDetalheDTO {
+        val prop = proposicaoRepo.findById(idProposicao)
+            .orElseThrow { IllegalArgumentException("Proposição não encontrada") }
 
-        // 1. Busca a Proposição Pai (Fail-fast: se não achar, para tudo agora)
-        val proposicao = proposicaoRepo.findById(idProposicao)
-            .orElseThrow { IllegalArgumentException("Proposição não encontrada com ID: $idProposicao") }
-
-        // 2. Cria a entidade do Histórico vinculada à Proposição
         val novoHistorico = ProposicaoHistorico(
             dataEvento = dto.dataEvento,
             faseTramitacao = dto.faseTramitacao,
+            unidadeResponsavel = dto.unidadeResponsavel,
             descricao = dto.descricao,
-            projeto = proposicao
+            projeto = prop
         )
 
-        // 3. Salva o registro histórico no banco
         historicoRepo.save(novoHistorico)
 
-        // 4. Lógica de Atualização de Status (A porta para automação futura)
-        // Se for um evento importante (ex: "Aprovado"), atualizamos o cabeçalho da Lei.
-        // Se for algo menor (ex: "Recebido no protocolo"), mantemos o status anterior.
         if (dto.atualizarStatusDaProposicao) {
-            proposicao.statusTramitacao = dto.faseTramitacao
-            proposicaoRepo.save(proposicao)
+            prop.statusTramitacao = dto.faseTramitacao
+            proposicaoRepo.save(prop)
         }
 
-        // 5. Retorna o DTO atualizado para o Front-end já mostrar a mudança na tela
-        return ProposicaoResumoDTO(
-            id = proposicao.id!!,
-            tipo = proposicao.tipo,
-            numero = proposicao.numero,
-            titulo = proposicao.titulo,
-            area = proposicao.areaTematica,
-            status = proposicao.statusTramitacao, // O status novo já vem aqui
-            data = proposicao.dataApresentacao,
-            minhaVinculacao = TipoVinculacao.AUTOR_PRINCIPAL // Valor padrão genérico para esta visualização
-        )
+        return buscarDetalhe(idProposicao)
+    }
+
+    @Transactional
+    fun atualizarTemas(idProposicao: Long, novosTemasIds: List<Long>): ProposicaoDetalheDTO {
+        val prop = proposicaoRepo.findById(idProposicao)
+            .orElseThrow { IllegalArgumentException("Proposição não encontrada") }
+
+        val novosTemas = temaRepo.findAllById(novosTemasIds)
+
+        prop.temas.clear()
+        prop.temas.addAll(novosTemas)
+
+        proposicaoRepo.save(prop)
+        return buscarDetalhe(idProposicao)
     }
 }

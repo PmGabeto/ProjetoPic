@@ -1,6 +1,8 @@
 package com.example.df.backend.entities
 
+
 import com.example.df.backend.enums.StatusPolitico
+import com.example.df.backend.enums.TipoAutor
 import com.fasterxml.jackson.annotation.JsonIgnore
 import jakarta.persistence.*
 
@@ -11,6 +13,13 @@ data class Politico(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "ID_POLITICO")
     val id: Long? = null,
+
+    @Column(name = "ID_EXTERNO_CLDF", unique = true, nullable = false)
+    var idExterno: Long?,
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "TIPO_AUTOR", nullable = false)
+    var tipoAutor: TipoAutor = TipoAutor.PARLAMENTAR, // Enum: PARLAMENTAR, COMISSAO, ORGAO_EXTERNO
 
     @Column(name = "NOME_COMPLETO", nullable = false)
     val nomeCompleto: String,
