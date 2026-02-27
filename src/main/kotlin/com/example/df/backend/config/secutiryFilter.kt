@@ -22,7 +22,7 @@ class SecurityFilter(
         filterChain: FilterChain
     ) {
         val path= request.requestURI
-        if (path.contains("/swagger") || path.contains("/api-docs") || path.contains("/auth")) {
+        if (path.contains("/swagger") || path.contains("/api-docs") || path.startsWith("/api/auth")) {
             filterChain.doFilter(request, response)
             return
         }

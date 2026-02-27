@@ -42,14 +42,14 @@ class SecurityConfig(
                     "/webjars/**",
                     "/error"
                 ).permitAll() // Documentação
-                auth.requestMatchers(HttpMethod.POST, "/auth/**").permitAll() // Login e Registro
+                auth.requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll() // Login e Registro
 
                 // 2. O QUE É EXCLUSIVO DE ADMIN (Dados Oficiais)
                 // "Só Admin pode CRIAR, EDITAR ou DELETAR Políticos, Obras e Proposições"
                 // O asterisco duplo (**) pega tudo que vem depois da barra.
-                auth.requestMatchers(HttpMethod.POST, "/politicos/**", "/obras/**", "/proposicoes/**").hasRole("ADMIN")
-                auth.requestMatchers(HttpMethod.PUT, "/politicos/**", "/obras/**", "/proposicoes/**").hasRole("ADMIN")
-                auth.requestMatchers(HttpMethod.DELETE, "/politicos/**", "/obras/**", "/proposicoes/**").hasRole("ADMIN")
+                auth.requestMatchers(HttpMethod.POST, "/api/politicos/**", "/api/obras/**", "/api/proposicoes/**").hasRole("ADMIN")
+                auth.requestMatchers(HttpMethod.PUT, "/api/politicos/**", "/api/obras/**", "/api/proposicoes/**").hasRole("ADMIN")
+                auth.requestMatchers(HttpMethod.DELETE, "/api/politicos/**", "/api/obras/**", "/api/proposicoes/**").hasRole("ADMIN")
 
 
 
