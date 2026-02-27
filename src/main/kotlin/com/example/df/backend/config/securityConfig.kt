@@ -69,7 +69,7 @@ class SecurityConfig(
     fun corsConfigurationSource(): CorsConfigurationSource {
         val configuration = CorsConfiguration()
         // Libera as portas comuns de Front-end (React, Angular, Flutter Web, etc)
-        configuration.allowedOrigins = listOf("http://localhost:3000", "http://localhost:4200", "http://localhost:8081","https://vigiaDF.pmhub.cloud","http://72.60.62.205:8080")
+        configuration.allowedOrigins = listOf("http://localhost:3000", "http://localhost:4200", "http://localhost:8081","https://vigiadf.pmhub.cloud","http://72.60.62.205:8080")
         configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
         configuration.allowedHeaders = listOf("Authorization", "Content-Type")
         configuration.allowCredentials = true
