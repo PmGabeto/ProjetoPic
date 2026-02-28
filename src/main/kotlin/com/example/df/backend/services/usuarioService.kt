@@ -41,7 +41,9 @@ class UsuarioService(
             numero = dto.numero,
             bairro = dto.bairro,
             urlFoto = dto.urlFoto,
-            perfil = dto.perfil
+            perfil = dto.perfil,
+            cidade = dto.cidade
+
         )
 
         return usuarioRepository.save(novoUsuario)

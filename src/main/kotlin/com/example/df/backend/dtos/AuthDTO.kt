@@ -74,7 +74,10 @@ data class RegistroDTO(
     val urlFoto: String? = null,
 
     @field:Schema(description = "Perfil de acesso do usuário", example = "user")
-    val perfil: TipoUser = TipoUser.user
+    val perfil: TipoUser = TipoUser.user,
+    @field:Schema(description = "Cidade", example = "Brasília")
+    @field:NotBlank(message = "Cidade é obrigatória") // Garante que não chegue vazio
+    val cidade: String
 )
 
 data class TokenResponseDTO(
