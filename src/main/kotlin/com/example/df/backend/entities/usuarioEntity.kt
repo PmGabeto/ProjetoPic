@@ -21,15 +21,15 @@ data class Usuario(
     val cpf: String,
 
     @Column(name = "NOME_COMPLETO", nullable = false)
-    val nomeCompleto: String,
+    var nomeCompleto: String,
 
     @Column(name ="URL_FOTO", length = 1000)
-    val urlFoto: String? = null,
+    var urlFoto: String? = null,
 
     @Column(nullable = false, unique = true)
     val email: String,
 
-    val telefone: String? = null,
+    var telefone: String? = null,
 
     @Column(name = "DT_NASCIMENTO", nullable = false)
     val dataNascimento: LocalDate,
@@ -49,7 +49,7 @@ data class Usuario(
 
     @Column(name = "SENHA_HASH", nullable = false)
     @JsonIgnore
-    val senhaHash: String,
+    var senhaHash: String,
 
     @Column(name = "MFA_ENABLED")
     val mfaEnabled: Boolean = false,

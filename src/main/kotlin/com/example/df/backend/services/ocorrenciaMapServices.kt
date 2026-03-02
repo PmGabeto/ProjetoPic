@@ -5,104 +5,101 @@ import com.example.df.backend.dtos.CriarOcorrenciaDTO
 import com.example.df.backend.entities.OcorrenciaMapa
 import com.example.df.backend.enums.StatusOcorrencia
 import com.example.df.backend.enums.TipoProblema
-import com.example.df.backend.repositories.OcorrenciaMapaRepository // Ajuste se a pasta for minuscula
+import com.example.df.backend.repositories.OcorrenciaMapaRepository
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
+import com.example.df.backend.services.FotoService
+import com.example.df.backend.dtos.OcorrenciaDetalheDTO
+import com.example.df.backend.dtos.FotoResponseDTO
+import java.time.LocalDateTime
 
 @Service
 class OcorrenciaService(
     private val repository: OcorrenciaMapaRepository,
     private val googleMapsService: GoogleMapsService,
-    private val appConfig: AppConfig
+    private val appConfig: AppConfig,
+    private val fotoservice: FotoService
 ) {
 
     // =========================================================================
-    // 1. CRIAR ocorrência (Com Validação PostGIS)
+    // 1. CRIAR Ocorrência
     // =========================================================================
     @Transactional
     fun criarToken(dto: CriarOcorrenciaDTO): OcorrenciaMapa {
-        // A. Resolver Coordenadas
         val (latBigDecimal, lonBigDecimal) = resolverCoordenadas(dto)
 
-        // B. Conversão para Double (Necessário apenas para a query do PostGIS)
         val lat = latBigDecimal.toDouble()
         val lon = lonBigDecimal.toDouble()
         val raio = appConfig.token.duplicata.raioMetros.toDouble()
 
-        // C. Busca Duplicidade (Usando a Query Nativa com PostGIS)
-        // Atenção: Os nomes dos parâmetros aqui (lat, lon) devem bater com os da Interface Repository
-        val duplicatas = repository.encontrarDuplicidades(
-            latitude = lat,
-            longitude = lon,
-            tipo = dto.tipo.name,
-            categoria = dto.categoriaProblema?.name,
-            raioMetros = raio
-        )
-
-        // D. Se a lista não estiver vazia, bloqueia
+        // Verifica duplicatas próximas usando PostGIS
+        val duplicatas = repository.buscarTokensProximos(lat, lon, raio)
         if (duplicatas.isNotEmpty()) {
-            val tokenExistente = duplicatas[0]
-
-            tokenExistente.quantidadeReportes +=1
-            return repository.save(tokenExistente)
+            val existente = duplicatas[0]
+            existente.quantidadeReportes += 1
+            return repository.save(existente)
         }
 
-        // E. Montar a Entidade para Salvar
-        // Aqui usamos o BigDecimal original para garantir precisão máxima no armazenamento
-        val novoToken = OcorrenciaMapa(
+        val novaOcorrencia = OcorrenciaMapa(
             tipo = dto.tipo,
             nome = dto.nome,
             descricao = dto.descricao,
+            categoriaProblema = dto.categoriaProblema,
             latitude = latBigDecimal,
             longitude = lonBigDecimal,
-            categoriaProblema = dto.categoriaProblema,
             status = StatusOcorrencia.ATIVO,
-            quantidadeReportes = 1
+            dataCriacao = LocalDateTime.now()
         )
 
-        // F. Salvar no Banco
-        return repository.save(novoToken)
+        return repository.save(novaOcorrencia)
     }
+
     // =========================================================================
-    // 1.1 atualizar status do token
-    // ===========================================
+    // 2. BUSCAS E LISTAGENS
+    // =========================================================================
+    fun listarTodas(): List<OcorrenciaDetalheDTO> {
+        return repository.findAll(Sort.by(Sort.Direction.DESC, "dataCriacao"))
+            .map { converterParaDetalheDTO(it) }
+    }
+
+    fun buscarPorId(id: Long): OcorrenciaDetalheDTO {
+        val entidade = repository.findById(id)
+            .orElseThrow { IllegalArgumentException("Ocorrência com ID $id não encontrada.") }
+        return converterParaDetalheDTO(entidade)
+    }
+
+    // =========================================================================
+    // 3. ATUALIZAÇÕES E EXCLUSÃO
+    // =========================================================================
     @Transactional
     fun atualizarStatus(id: Long, novoStatus: StatusOcorrencia): OcorrenciaMapa {
-        // 1. Busca o token (se não achar, lança erro)
-        val token = buscarPorId(id)
-
-        // 2. Regra de Negócio (Opcional): Impedir reabertura de chamados
-        // if (token.status == StatusOcorrencia.RESOLVIDO && novoStatus == StatusOcorrencia.ATIVO) {
-        //     throw IllegalArgumentException("Não é possível reabrir um chamado resolvido.")
-        // }
-
-        // 3. Atualiza na memória
-        token.status = novoStatus
-
-        // 4. Salva no banco
-        return repository.save(token)
-    }
-    // =========================================================================
-    // 2. FUNÇÕES DE CRUD (Listar, Buscar, Deletar)
-    // =========================================================================
-
-    fun listarTokens(): List<OcorrenciaMapa> {
-        return repository.findAll(Sort.by(Sort.Direction.DESC, "dataCriacao"))
-    }
-
-    fun buscarPorId(id: Long): OcorrenciaMapa {
-        return repository.findById(id)
-            .orElseThrow { IllegalArgumentException("Token não encontrado com ID: $id") }
+        val ocorrencia = repository.findById(id)
+            .orElseThrow { IllegalArgumentException("Ocorrência não encontrada.") }
+        ocorrencia.status = novoStatus
+        return repository.save(ocorrencia)
     }
 
     @Transactional
     fun deletarToken(id: Long) {
-        if (!repository.existsById(id)) {
-            throw IllegalArgumentException("Token não encontrado para deletar.")
+        // 1. Busca a entidade completa com as fotos
+        val ocorrencia = repository.findById(id)
+            .orElseThrow { IllegalArgumentException("Ocorrência não encontrada.") }
+
+        // 2. Loop para apagar cada foto associada (Disco + Banco)
+        // Chamamos o fotoService para cada publicId da lista de fotos
+        ocorrencia.fotos.forEach { foto ->
+            try {
+                fotoservice.deletarArquivoFisico(foto.publicId)
+            } catch (e: Exception) {
+                // Logamos o erro mas continuamos para não travar a exclusão da ocorrência
+                println("Aviso: Falha ao remover foto física ${foto.publicId}: ${e.message}")
+            }
         }
-        repository.deleteById(id)
+
+        // 3. Agora que as fotos (filhos) foram removidas, apagamos a ocorrência (pai)
+        repository.delete(ocorrencia)
     }
     fun listarComFiltros(
         categoria: TipoProblema?,
@@ -111,38 +108,57 @@ class OcorrenciaService(
         minLon: Double?,
         maxLat: Double?,
         maxLon: Double?
-    ): List<OcorrenciaMapa> {
+    ): List<OcorrenciaDetalheDTO> {
+        // Chama o repositório (convertendo enums para String se necessário)
+        val entidades = repository.buscarComFiltros(
+            categoria?.name,
+            status?.name,
+            minLat, minLon, maxLat, maxLon
+        )
 
-        // Aqui chamamos a query poderosa do Repository
-        return repository.buscarComFiltros(
-            categoria = categoria?.name, // Converte Enum para String (ou null)
-            status = status?.name,       // Converte Enum para String (ou null)
-            minLat = minLat,
-            minLon = minLon,
-            maxLat = maxLat,
-            maxLon = maxLon
+        // Converte a lista de entidades para a lista de DTOs (usando o conversor que já criamos)
+        return entidades.map { converterParaDetalheDTO(it) }
+    }
+
+    // =========================================================================
+    // 4. CONVERSORES (Mapeamento de URL de Fotos)
+    // =========================================================================
+    private fun converterParaDetalheDTO(entidade: OcorrenciaMapa): OcorrenciaDetalheDTO {
+        val fotosDto = entidade.fotos.map { foto ->
+            FotoResponseDTO(
+                id = foto.id ?: 0,
+                publicId = foto.publicId, // CAMPO QUE ESTAVA FALTANDO
+                url = "https://vigiadf.pmhub.cloud/api/foto/v/${foto.publicId}", // Rota simplificada
+                nomeOriginal = foto.nomeOriginal
+            )
+        }
+
+        return OcorrenciaDetalheDTO(
+            id = entidade.id ?: 0,
+            tipo = entidade.tipo,
+            status = entidade.status,
+            nome = entidade.nome ?: "Sem Nome",
+            descricao = entidade.descricao,
+            categoriaProblema = entidade.categoriaProblema,
+            latitude = entidade.latitude,
+            longitude = entidade.longitude,
+            quantidadeReportes = entidade.quantidadeReportes,
+            dataCriacao = entidade.dataCriacao,
+            fotos = fotosDto
         )
     }
-    // =========================================================================
-    // 3. AUXILIARES
-    // =========================================================================
 
     private fun resolverCoordenadas(dto: CriarOcorrenciaDTO): Pair<BigDecimal, BigDecimal> {
-        // Prioridade 1: GPS do Celular
         if (dto.latitude != null && dto.longitude != null) {
             return Pair(dto.latitude, dto.longitude)
         }
 
-        // Prioridade 2: Endereço escrito (Google Maps)
         if (!dto.endereco.isNullOrBlank()) {
             val coords = googleMapsService.geocodificarEndereco(dto.endereco)
-            if (coords != null) {
-                return coords
-            }
+            if (coords != null) return coords
             throw IllegalArgumentException("Endereço não encontrado pelo Google Maps.")
         }
 
-        // Se não mandou nada
         throw IllegalArgumentException("É necessário informar Latitude/Longitude OU um Endereço válido.")
     }
 }

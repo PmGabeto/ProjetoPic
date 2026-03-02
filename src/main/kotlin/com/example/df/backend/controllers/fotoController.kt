@@ -1,67 +1,88 @@
 package com.example.df.backend.controllers
 
+import com.example.df.backend.entities.OcorrenciaFoto
 import com.example.df.backend.services.FotoService
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.media.Content
+import io.swagger.v3.oas.annotations.media.Schema
+import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.tags.Tag
-import jakarta.servlet.http.HttpServletRequest
 import org.springframework.core.io.Resource
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
-import org.springframework.web.servlet.HandlerMapping
-import java.nio.file.Files
-@Tag(name = "6. Gestão de Fotos", description = "Endpoints para upload e visualização pública de arquivos de mídia")
+
+@Tag(name = "6. Gestão de Mídias", description = "Endpoints unificados para upload e visualização de fotos do sistema")
 @RestController
-@RequestMapping("/api/foto") // Mudei a base para /api para ficar organizado
+@RequestMapping("/api/foto")
 class FotoController(
     private val fotoService: FotoService
 ) {
 
-    // 1. UPLOAD DE OCORRÊNCIA (TOKEN)
-    // Rota: POST /api/tokens/{id}/fotos
-    @Operation(summary = "Upload de foto de ocorrência", description = "Vincula uma imagem a uma denúncia existente via ID.")
-    @PostMapping("/tokens/{id}", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
-    fun uploadFotoOcorrencia(
+    @Operation(
+        summary = "Upload unificado de arquivos",
+        description = "Realiza o upload, compressão e armazenamento de fotos. O parâmetro 'tipo' define a pasta (OBRA, PERFIL, DEPUTADO, OCORRENCIA)."
+    )
+    @ApiResponse(responseCode = "200", description = "Upload realizado com sucesso")
+    @PostMapping("/upload/{tipo}/{id}", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+    fun uploadGeral(
+        @Parameter(description = "Tipo da mídia (Ex: OBRA, PERFIL, DEPUTADO, OCORRENCIA)", example = "OCORRENCIA")
+        @PathVariable tipo: String,
+
+        @Parameter(description = "ID da entidade relacionada (ID da Obra, ID do Usuário, etc.)", example = "10")
         @PathVariable id: Long,
+
+        @Parameter(description = "Arquivo de imagem (JPG, PNG)")
         @RequestParam("file") file: MultipartFile
     ): ResponseEntity<Any> {
         return try {
-            // Note que mudei o nome do método no service para salvarFotoOcorrencia
-            val fotoSalva = fotoService.salvarFotoOcorrencia(id, file)
-            ResponseEntity.status(201).body(fotoSalva)
+            val fotoSalva = fotoService.salvarMidiaGeral(tipo, id, file)
+            ResponseEntity.ok(fotoSalva)
         } catch (e: Exception) {
-            ResponseEntity.badRequest().body(mapOf("erro" to e.message))
+            ResponseEntity.badRequest().body(mapOf("erro" to (e.message ?: "Erro desconhecido no upload")))
         }
     }
 
-    // (O Upload de Foto de Perfil fica no UsuarioController, usando o service novo)
-
-    // 2. VISUALIZAR QUALQUER FOTO (Perfil ou Ocorrência)
-    // Rota: GET /api/public/fotos/perfis/123.jpg ou /api/public/fotos/ocorrencias/abc.jpg
-    @Operation(summary = "Visualizar foto (Público)", description = "Recupera o arquivo de imagem do servidor para exibição no App/Web.")
-    @GetMapping("/publico/**")
-    fun visualizarFoto(request: HttpServletRequest): ResponseEntity<Resource> {
-        // O "/**" permite passar barras na URL
-
-        // Pega o caminho depois de "/public/fotos/"
-        val path = request.getAttribute(HandlerMapping.PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE) as String
-        val melhorMatch = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE) as String
-
-        // Extrai: "perfis/minhafoto.jpg"
-        val caminhoRelativo = path.substringAfter("/public/fotos/")
-
+    @Operation(
+        summary = "Visualizar mídia via Public ID",
+        description = "Recupera o arquivo físico do servidor usando o identificador seguro de 12 caracteres."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Imagem encontrada",
+        content = [Content(mediaType = "image/jpeg")]
+    )
+    @GetMapping("/v/{publicId}")
+    fun visualizar(
+        @Parameter(description = "ID público da foto (12 caracteres)", example = "k9B2xP7mL1")
+        @PathVariable publicId: String
+    ): ResponseEntity<Resource> {
         return try {
-            val arquivo = fotoService.carregarFoto(caminhoRelativo)
-            val contentType = Files.probeContentType(arquivo.file.toPath()) ?: "application/octet-stream"
+            val (recurso, contentType) = fotoService.buscarRecursoFisico(publicId)
 
             ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"${arquivo.filename}\"")
-                .body(arquivo)
+                // Cache de 1 ano para performance (as fotos nunca mudam, são deletadas e criadas novas)
+                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=300")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"$publicId\"")
+                .body(recurso)
         } catch (e: Exception) {
             ResponseEntity.notFound().build()
+        }
+    }
+
+    @Operation(summary = "Deletar mídia", description = "Remove o registro do banco e o arquivo físico do servidor.")
+    @DeleteMapping("/{publicId}")
+    fun deletar(@PathVariable publicId: String): ResponseEntity<Any> {
+        return try {
+            fotoService.deletarArquivoFisico(publicId)
+            // Note: Adicione a lógica de exclusão no repositório dentro do service se necessário
+            ResponseEntity.noContent().build()
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf("erro" to e.message))
         }
     }
 }

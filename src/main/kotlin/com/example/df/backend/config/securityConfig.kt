@@ -43,7 +43,7 @@ class SecurityConfig(
                     "/error"
                 ).permitAll() // Documentação
                 auth.requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll() // Login e Registro
-
+                auth.requestMatchers(HttpMethod.GET, "/api/foto/v/**").permitAll()
                 // 2. O QUE É EXCLUSIVO DE ADMIN (Dados Oficiais)
                 // "Só Admin pode CRIAR, EDITAR ou DELETAR Políticos, Obras e Proposições"
                 // O asterisco duplo (**) pega tudo que vem depois da barra.
