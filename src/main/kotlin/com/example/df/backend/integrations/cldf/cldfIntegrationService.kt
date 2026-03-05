@@ -87,7 +87,6 @@ class CldfIntegrationService(
                     // Mantemos a paginação na URL (padrão do Spring Pageable)
                     .queryParam("page", pagina)
                     .queryParam("size", tamanho)
-                    .queryParam("sort", "dataApresentacao,DESC")
                     .build()
                 }
                 .header("Content-Type", "application/json") // 3. Forçando o formato                .bodyValue(filtroJson) // Injeta o JSON no Body da requisição
