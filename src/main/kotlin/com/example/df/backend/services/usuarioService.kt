@@ -42,34 +42,21 @@ class UsuarioService(
     // ATUALIZAÇÃO DE FOTO DE PERFIL (REFATORADO)
     // =========================================================================
     @Transactional
-    fun atualizarFotoPerfil(usuario: Usuario, arquivo: MultipartFile): String {
-        // 1. Limpeza: Se o usuário já tem uma URL de foto, extraímos o publicId para deletar
-        // Exemplo de url: https://vigiadf.pmhub.cloud/api/foto/v/ABC123XYZ456
-        usuario.urlFoto?.let { urlAntiga ->
-            val publicIdAntigo = urlAntiga.substringAfterLast("/")
-            try {
-                fotoService.deletarArquivoFisico(publicIdAntigo)
-            } catch (e: Exception) {
-                // Logar erro mas permitir continuar se o arquivo físico já não existir
-            }
-        }
-
-        // 2. Salvamento: Usamos o novo método unificado do FotoService
-        // O tipo "PERFIL" garante que caia na pasta /perfis
+    fun alterarFotoPerfil(usuario: Usuario, file: MultipartFile): String {
+        // 1. O FotoService salva na VPS, no banco e retorna a entidade com o publicId
         val fotoEntidade = fotoService.salvarMidiaGeral(
             tipo = "PERFIL",
-            targetId = usuario.id ?: 0L,
-            arquivo = arquivo
+            targetId = usuario.id!!,
+            arquivo = file
         )
 
-        // 3. Montamos a nova URL padrão
-        val novaUrl = "https://vigiadf.pmhub.cloud/api/foto/v/${fotoEntidade.publicId}"
-
-        // 4. Atualizamos o usuário no banco
-        usuario.urlFoto = novaUrl
+        // 2. Salvamos APENAS o publicId no campo de foto do usuário
+        // Isso garante flexibilidade se o endereço do seu servidor mudar
+        usuario.urlFoto = fotoEntidade.publicId
         usuarioRepository.save(usuario)
 
-        return novaUrl
+        // 3. Retornamos o publicId (ou a URL se o front precisar agora, mas o banco guarda o ID)
+        return fotoEntidade.publicId
     }
 
     @Transactional

@@ -7,7 +7,45 @@ enum class StatusObra {
     PARALISADA,     // O pesadelo do cidadão
     CONCLUIDA       // Obra entregue
 }
+enum class RaAdministrativa{
 
+    ÁGUAS_CLARAS,
+    BRAZLÂNDIA,
+    CANDANGOLÂNDIA,
+    CEILÂNDIA,
+    CRUZEIRO,
+    FERCAL,
+    GAMA,
+    GUARÁ,
+    ITAPOÃ,
+    JARDIM_BOTÂNICO,
+    LAGO_NORTE,
+    LAGO_SUL,
+    NÚCLEO_BANDEIRANTE,
+    PARANOÁ,
+    PARK_WAY,
+    PLANALTINA,
+    PLANO_PILOTO,
+    RECANDO_DAS_EMAS,
+    RIACHO_FUNDO_I,
+    RIACHO_FUNDO_II,
+    SAMAMBAIA,
+    SANTA_MARIA,
+    SÃO_SEBASTIÃO,
+    SCIA_ESTRUTURAL,
+    SIA,
+    SOBRADINHO,
+    SOBRADINHO_II,
+    SUDOESTE_OCTOGONAL,
+    TAGUATINGA,
+    VARJÃO,
+    VICENTE_PIRES,
+    ARNIQUEIRAS,
+    SOL_NASCENTE,
+    ARAPOANGA,
+    ÁGUA_QUENTE,
+
+}
 enum class OrgaoExecutor {
     NOVACAP, // Urbanização
     DER,     // Estradas

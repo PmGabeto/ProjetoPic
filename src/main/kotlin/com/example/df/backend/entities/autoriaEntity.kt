@@ -13,8 +13,8 @@ class Autoria(
     val id: AutoriaId = AutoriaId(),
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "TIPO_VINCULACAO", nullable = false)
-    val tipoVinculacao: TipoVinculacao, // AUTOR_PRINCIPAL ou CO_AUTOR
+    @Column(name = "TIPO_VINCULACAO", nullable = true)
+    val tipoVinculacao: TipoVinculacao? = TipoVinculacao.AUTOR, // AUTOR_PRINCIPAL ou CO_AUTOR
 
     // --- LADO DO POLÍTICO ---
     @ManyToOne(fetch = FetchType.LAZY)

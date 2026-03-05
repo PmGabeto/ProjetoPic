@@ -9,12 +9,17 @@ import org.springframework.stereotype.Repository
 
 @Repository
 interface PoliticoRepository : JpaRepository<Politico, Long> {
-    // Exemplo: Buscar por nome (case insensitive) para busca rápida
+    // Busca por nome (case insensitive) para busca rápida
     fun findByNomeUrnaContainingIgnoreCase(nome: String): List<Politico>
+    fun findByPublicId(publicId: String): Politico?}
+
+@Repository
+interface ProposicaoRepository : JpaRepository<Proposicao, Long> {
+    // NOVO: Busca a proposição usando a nossa Business Key (String)
+    fun findByPublicId(publicId: String): Proposicao?
 }
 
 @Repository
-interface ProposicaoRepository : JpaRepository<Proposicao, Long>
-
-@Repository
-interface AutoriaRepository : JpaRepository<Autoria, AutoriaId>
+interface AutoriaRepository : JpaRepository<Autoria, AutoriaId> {
+    fun findByPolitico(politico: Politico): List<Autoria>
+}

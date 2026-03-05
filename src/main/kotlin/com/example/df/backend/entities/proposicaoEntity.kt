@@ -12,8 +12,8 @@ data class Proposicao(
     @Column(name = "ID_PROJETO")
     val id: Long? = null,
 
-    @Column(name = "ID_EXTERNO_CLDF", unique = true, nullable = false)
-    val idExterno: Long,
+    @Column(name = "publicId", unique = true, nullable = false)
+    val publicId: String,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "TIPO", nullable = false)
@@ -30,7 +30,7 @@ data class Proposicao(
 
     @Lob
     @Column(name = "EMENTA")
-    val ementa: String? = null,
+    var ementa: String? = null,
 
     @Column(name = "STATUS_TRAMITACAO")
     var statusTramitacao: String? = null,
@@ -53,9 +53,8 @@ data class Proposicao(
     @Column(name = "ID_UNIDADE_GERADORA")
     val idUnidadeGeradora: Long? = null,
 
-    @Column(name = "LINK_COMPLETO")
-    var linkCompleto: String? = null,
-
+@Column(name = "LINK_COMPLETO")
+val linkCompleto: String?,
     // Relacionamento com Tema para filtros dinâmicos
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
@@ -68,9 +67,9 @@ data class Proposicao(
     @OneToMany(mappedBy = "proposicao", cascade = [CascadeType.ALL], orphanRemoval = true)
     val autores: List<Autoria> = mutableListOf(),
 
-    @OneToMany(mappedBy = "proposicao", cascade = [CascadeType.ALL], orphanRemoval = true)
-    val documentos: List<DocumentoProposicao> = mutableListOf(),
-
-    @OneToMany(mappedBy = "projeto", cascade = [CascadeType.ALL], orphanRemoval = true)
-    val historicos: List<ProposicaoHistorico> = mutableListOf()
+    @OneToMany(mappedBy = "projeto", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
+    val historico: List<ProposicaoHistorico> = listOf()
 )
+fun Proposicao.gerarLinkCldf(): String {
+    return "https://ple.cl.df.gov.br/#/proposicao/${this.publicId}/consultar?buscar=true"
+}

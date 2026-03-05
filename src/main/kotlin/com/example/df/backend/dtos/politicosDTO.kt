@@ -1,18 +1,32 @@
 package com.example.df.backend.dtos
 
 import com.example.df.backend.enums.*
+import com.fasterxml.jackson.annotation.JsonProperty
 import io.swagger.v3.oas.annotations.media.Schema
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 // --- DTOs AUXILIARES ---
-
+// DTOs temas CLDF
 data class TemaDTO(
+    @field: JsonProperty("value") // Isso diz ao Jackson: "Leia 'value' e salve em 'id'"
     @field:Schema(description = "ID do Tema", example = "10")
     val id: Long,
+    @field: JsonProperty("label")
     @field:Schema(description = "Nome do Tema", example = "Educação")
     val nome: String
 )
+@Schema(description = "Resultado da operação de sincronização de temas")
+data class SincronizacaoResponseDTO(
 
+    @field:Schema(description = "Mensagem descritiva do status da operação", example = "Sincronização realizada com sucesso.")
+    val mensagem: String,
+
+      @field:Schema(description = "Data e hora em que a sincronização foi executada")
+    val timestamp: LocalDateTime = LocalDateTime.now()
+
+)
+// Dtos Proposicao
 data class TipoProposicaoDTO(
     @field:Schema(description = "Sigla do projeto", example = "PL")
     val sigla: String,
@@ -21,10 +35,10 @@ data class TipoProposicaoDTO(
     @field:Schema(description = "Explicação fácil para o cidadão", example = "Criação de novas leis para o DF.")
     val descricaoPedagogica: String
 )
-
+// Dtos Arquivos Documentos
 data class DocumentoDTO(
     @field:Schema(description = "ID do documento na CLDF", example = "9876")
-    val idExterno: Long,
+    val publicId:String,
     @field:Schema(description = "Tipo do Documento", example = "Parecer")
     val tipo: String,
     @field:Schema(description = "Data de emissão", example = "2024-02-10")
@@ -52,7 +66,7 @@ data class PoliticoResumoDTO(
     @field:Schema(description = "ID interno", example = "1")
     val id: Long,
     @field:Schema(description = "ID na CLDF", example = "12345")
-    val idExterno: Long? = null,
+    val publicId:String,
     @field:Schema(description = "Nome público", example = "João Deputado")
     val nome: String,
     @field:Schema(description = "Partido atual", example = "PDB")
@@ -82,10 +96,8 @@ data class PoliticoDetalheDTO(
     val foto: String?,
     @field:Schema(description = "História resumida", example = "Nasceu em Brasília, atuante na área da saúde.")
     val biografia: String?,
-    @field:Schema(description = "Região principal de atuação", example = "CEILANDIA")
-    val baseEleitoral: String?,
-    @field:Schema(description = "Grupos ou sindicatos apoiados", example = "Sindicato dos Médicos")
-    val entidadesVinculadas: String? = null,
+
+
     @field:Schema(description = "Projetos em autoria", implementation = ProposicaoResumoDTO::class)
     val proposicoes: List<ProposicaoResumoDTO>
 )
@@ -97,7 +109,7 @@ data class ProposicaoResumoDTO(
     val id: Long,
 
     @field:Schema(description = "ID da proposição na API da CLDF", example = "45678")
-    val idExterno: Long? = null,
+    val publicId: String,
 
     @field:Schema(description = "Tipo da proposição (ex: PL, PDL)", implementation = TipoProposicaoDTO::class)
     val tipo: TipoProposicaoDTO,
@@ -112,20 +124,23 @@ data class ProposicaoResumoDTO(
     val tema: List<TemaDTO>,
 
     @field:Schema(description = "Status atual de tramitação", example = "Em Análise")
-    val status: String,
+    val status: String?,
+
+    val ementa: String?,
 
     @field:Schema(description = "Data de apresentação da proposição", example = "2024-02-27")
     val data: LocalDate,
 
     @field:Schema(description = "Tipo de vinculação do autor (se for autor principal ou coautor)", example = "AUTOR_PRINCIPAL")
-    val minhaVinculacao: TipoVinculacao?
+    val minhaVinculacao: TipoVinculacao?,
+    val linkCompleto: String?
 )
 data class ProposicaoDetalheDTO(
     @field:Schema(description = "ID interno da proposição", example = "1")
     val id: Long,
 
     @field:Schema(description = "ID da proposição na API da CLDF", example = "45678")
-    val idExterno: Long,
+    val publicId: String,
 
     @field:Schema(description = "Tipo da proposição detalhada", implementation = TipoProposicaoDTO::class)
     val tipo: TipoProposicaoDTO,
@@ -161,20 +176,22 @@ data class ProposicaoDetalheDTO(
     val tema: List<TemaDTO>,
 
     @field:Schema(description = "Documentos oficiais (PDFs, pareceres) anexados ao projeto", implementation = DocumentoDTO::class)
-    val documentos: List<DocumentoDTO>,
+    val documentos: List<DocumentoResponseDTO>,
 
     @field:Schema(description = "Histórico de todas as movimentações do projeto", implementation = HistoricoDTO::class)
     val historicos: List<HistoricoDTO>,
 
     @field:Schema(description = "Lista de políticos que são autores ou coautores", implementation = PoliticoResumoDTO::class)
-    val autores: List<PoliticoResumoDTO>
+    val autores: List<PoliticoResumoDTO>,
+
+    val linkCompleto: String?
 )
 
 // --- DTOs DE ENTRADA ---
 
 data class CriarPoliticoDTO(
     @field:Schema(description = "ID da API da CLDF (se houver)", example = "12345")
-    val idExterno: Long? = null,
+    val publicId:String,
     @field:Schema(description = "Nome de registro", example = "João Batista Silva")
     val nomeCompleto: String,
     @field:Schema(description = "Como aparece na urna", example = "João Deputado")
@@ -185,12 +202,10 @@ data class CriarPoliticoDTO(
     val partidoAtual: String?,
     @field:Schema(description = "URL da Imagem", example = "https://link.com/foto.jpg")
     val urlFoto: String?,
-    @field:Schema(description = "RA Base", example = "CEILANDIA")
-    val raBaseEleitoral: String?,
+
     @field:Schema(description = "Breve biografia", example = "Defensor da educação...")
     val biografiaResumida: String?,
-    @field:Schema(description = "Entidades de apoio", example = "APAE")
-    val entidadesVinculadas: String? = null
+
 )
 
 data class AtualizarPoliticoDTO(
@@ -200,19 +215,17 @@ data class AtualizarPoliticoDTO(
     val partidoAtual: String?,
     @field:Schema(description = "Nova foto", example = "https://link.com/foto_nova.jpg")
     val urlFoto: String?,
-    @field:Schema(description = "Nova base de atuação", example = "PLANO_PILOTO")
-    val raBaseEleitoral: String?,
+
     @field:Schema(description = "Atualizar Biografia", example = "Agora atuando também no Gama.")
     val biografiaResumida: String?,
     @field:Schema(description = "Atualizar Status", example = "INATIVO")
     val status: StatusPolitico?,
-    @field:Schema(description = "Atualizar entidades", example = "APAE, Sindicato XYZ")
-    val entidadesVinculadas: String?
+
 )
 
 data class CriarProposicaoDTO(
     @field:Schema(description = "ID de integração com a CLDF (Opcional)", example = "45678")
-    val idExterno: Long? = null,
+    val publicId: String,
 
     @field:Schema(description = "Sigla do tipo de proposição", example = "PL")
     val tipoSigla: String,
@@ -234,9 +247,8 @@ data class CriarProposicaoDTO(
 
     @field:Schema(description = "Lista de IDs dos temas", example = "[1, 4, 7]")
     val temaId: List<Long>,
+val linkCompleto : String?,
 
-    @field:Schema(description = "Link para o PDF da proposição", example = "https://cldf.gov.br/doc.pdf")
-    val linkCompleto: String?,
 
     @field:Schema(description = "Tipo de autoria do político ao cadastrar", example = "AUTOR_PRINCIPAL")
     val tipoVinculacao: TipoVinculacao

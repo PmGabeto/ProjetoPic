@@ -1,11 +1,9 @@
 package com.example.df.backend.controllers
 
-import com.example.df.backend.entities.OcorrenciaFoto
 import com.example.df.backend.services.FotoService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Content
-import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.core.io.Resource

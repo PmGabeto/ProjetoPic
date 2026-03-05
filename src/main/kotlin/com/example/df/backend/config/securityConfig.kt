@@ -47,6 +47,7 @@ class SecurityConfig(
                 // 2. O QUE É EXCLUSIVO DE ADMIN (Dados Oficiais)
                 // "Só Admin pode CRIAR, EDITAR ou DELETAR Políticos, Obras e Proposições"
                 // O asterisco duplo (**) pega tudo que vem depois da barra.
+                auth.requestMatchers("/api/i/cldf/**").hasRole("ADMIN")
                 auth.requestMatchers(HttpMethod.POST, "/api/politicos/**", "/api/obras/**", "/api/proposicoes/**").hasRole("ADMIN")
                 auth.requestMatchers(HttpMethod.PUT, "/api/politicos/**", "/api/obras/**", "/api/proposicoes/**").hasRole("ADMIN")
                 auth.requestMatchers(HttpMethod.DELETE, "/api/politicos/**", "/api/obras/**", "/api/proposicoes/**").hasRole("ADMIN")

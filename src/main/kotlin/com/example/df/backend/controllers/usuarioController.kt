@@ -49,17 +49,20 @@ class UsuarioController(
             ResponseEntity.badRequest().body(mapOf("erro" to e.message))
         }
     }
-    @Operation(summary = "Upload de foto de perfil", description = "Envia e define a imagem de avatar do usuário.")
+    @Operation(summary = "Upload de foto de perfil", description = "Envia e define o publicId da imagem de avatar do usuário.")
     @PostMapping("/foto")
     fun uploadFoto(
         @AuthenticationPrincipal usuario: Usuario,
         @RequestParam("file") file: MultipartFile
     ): ResponseEntity<Any> {
         return try {
-            val url = usuarioService.atualizarFotoPerfil(usuario, file)
-            ResponseEntity.ok(mapOf("url" to url))
+            // Chamada corrigida para 'alterarFotoPerfil' conforme sua nova lógica
+            val publicId = usuarioService.alterarFotoPerfil(usuario, file)
+
+            // Retornamos o publicId. O Front-end usará isso para montar a URL de visualização
+            ResponseEntity.ok(mapOf("publicId" to publicId))
         } catch (e: Exception) {
-            ResponseEntity.badRequest().body(mapOf("erro" to "Erro ao salvar foto"))
+            ResponseEntity.badRequest().body(mapOf("erro" to "Erro ao salvar foto: ${e.message}"))
         }
     }
 }

@@ -3,149 +3,177 @@ package com.example.df.backend.services
 import com.example.df.backend.dtos.*
 import com.example.df.backend.entities.Obra
 import com.example.df.backend.entities.ObraHistorico
+import com.example.df.backend.entities.OrcamentoAditivo
 import com.example.df.backend.enums.OrgaoExecutor
 import com.example.df.backend.enums.StatusObra
-import com.example.df.backend.repositories.ObraHistoricoRepository
-import com.example.df.backend.repositories.ObraRepository
+import com.example.df.backend.enums.RaAdministrativa
+import com.example.df.backend.repositories.*
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.math.BigDecimal
 import java.time.LocalDateTime
-
 
 @Service
 class ObraService(
     private val repository: ObraRepository,
-    private val historicoRepository: ObraHistoricoRepository
+    private val historicoRepository: ObraHistoricoRepository,
+    private val aditivoRepository: AditivosRepository,
+    private val fotoRepository: OcorrenciaFotoRepository,
+    private val documentoService: DocumentoService // 1. Injetamos o novo serviço de documentos
 ) {
 
-    // A. PARA O MAPA (Retorna só os PINS)
-    fun listarPins(): List<ObraPinDTO> {
-        // 1. Buscamos todas
-        return repository.findAll()
-            // 2. Filtramos: Só passam as que NÃO estão concluídas
-            .filter { it.status != StatusObra.CONCLUIDA }
-            // 3. Mapeamos para o DTO
-            .map { obra ->
-                ObraPinDTO(
-                    id = obra.id!!,
-                    latitude = obra.latitude?.toDouble() ?: 0.0,
-                    longitude = obra.longitude?.toDouble() ?: 0.0,
-                    nome = obra.nome,
-                    status = obra.status, // Converte string para Enum
-                    progresso = obra.percentualConclusao
-                )
-            }
+    // =========================================================================
+    // 1. CONSULTAS
+    // =========================================================================
+
+    fun listarPins(incluirConcluidas: Boolean = false): List<ObraPinDTO> {
+        return repository.buscarDadosSimplificadosMapa(incluirConcluidas).map { p ->
+            ObraPinDTO(
+                id = p.id,
+                latitude = p.latitude,
+                longitude = p.longitude,
+                nome = p.nome,
+                endereco = p.endereco,
+                status = p.status,
+                orgao = p.orgaoExecutor,
+                ra = p.raAdministrativa,
+                progresso = p.progresso
+            )
+        }
     }
-    // B. PARA A LISTAGEM (Com Filtros)
-    fun listarObras(ra: String?, orgao: OrgaoExecutor?): List<ObraListagemDTO> {
-        return repository.buscarComFiltros(ra, orgao).map { obra ->
+
+    fun listarObras(
+        ra: RaAdministrativa?,
+        orgao: OrgaoExecutor?,
+        status: List<StatusObra>?
+    ): List<ObraListagemDTO> {
+        // Aqui usamos o método 'buscarComFiltros' que está no seu ObraRepository
+        return repository.buscarComFiltros(ra, orgao, status).map { obra ->
             ObraListagemDTO(
                 id = obra.id!!,
                 nome = obra.nome,
-                orgao = obra.orgaoExecutor,
                 ra = obra.raAdministrativa,
+                orgao = obra.orgaoExecutor,
                 status = obra.status,
-                progresso = obra.percentualConclusao
+                progresso = obra.percentualConclusao,
+                dataAtualizacao = obra.dataUltimaAtualizacao.toLocalDate()
             )
         }
     }
-
-    // C. DETALHE ÚNICO
-    @Transactional(readOnly = true)
     fun buscarDetalhes(id: Long): ObraDetalheDTO {
         val obra = repository.findById(id)
-            .orElseThrow { IllegalArgumentException("Obra não encontrada com ID: $id") }
+            .orElseThrow { NoSuchElementException("Obra não encontrada") }
 
-        // Mapeia o histórico da entidade para o DTO
-        val historicoDTOs = obra.historico.map { h ->
-            HistoricoResumoDTO(
-                data = h.dataAtualizacao.toLocalDate(),
-                descricao = h.descricaoMudanca,
-                statusNovo = h.statusNovo
+        // 2. Buscamos as fotos (Lógica que você já tinha)
+        val fotos = fotoRepository.findByTipoMidiaAndIdRelacionado("OBRA", id).map { foto ->
+            FotoResponseDTO(
+                id = foto.id ?: 0,
+                publicId = foto.publicId, // Certifique-se que o campo na Entity é publicId
+                url = "https://vigiadf.pmhub.cloud/api/foto/v/${foto.publicId}",
+                nomeOriginal = foto.nomeOriginal // Certifique-se que o campo na Entity é nomeOriginal
             )
         }
-
-        // Mapeia os aditivos da entidade para o DTO
-        val aditivosDTOs = obra.aditivos.map { a ->
-            AditivoResumoDTO(
-                data = a.dataAprovacao,
-                valor = a.valor,
-                justificativa = a.justificativa
-            )
-        }
+        // 3. BUSCA DINÂMICA DE DOCUMENTOS (Nova lógica)
+        val documentos = documentoService.listarDocumentos("OBRA", id)
 
         return ObraDetalheDTO(
             id = obra.id!!,
             nome = obra.nome,
             descricao = obra.descricao,
-            orgao = obra.orgaoExecutor,
+            endereco = obra.endereco,
             ra = obra.raAdministrativa,
+            orgao = obra.orgaoExecutor,
             status = obra.status,
-            orcamento = obra.orcamentoPrevisto,
             progresso = obra.percentualConclusao,
-            inicio = obra.dataInicioPrevista,
-            fim = obra.dataFimPrevista,
-            linkDocumento = obra.urlDocumento,
-            historico = historicoDTOs,
-            aditivos = aditivosDTOs
+            orcamentoPrevisto = obra.orcamentoPrevisto,
+            dataInicio = obra.dataInicioPrevista,
+            dataFim = obra.dataFimPrevista,
+            empresaContratada = obra.empresaContratada,
+            documentos = documentos, // 4. Injetamos a lista no DTO de resposta
+            fotos = fotos,
+            historico = obra.historico.map { HistoricoResumoDTO(it.dataAtualizacao.toLocalDate(), it.descricaoMudanca, it.statusNovo) },
+            aditivos = obra.aditivos.map { AditivoResumoDTO(it.dataAprovacao, it.valor, it.justificativa) }
         )
     }
 
-    // D. CADASTRAR (Manual MVP)
+    // =========================================================================
+    // 2. MANUTENÇÃO (CRIAÇÃO E ATUALIZAÇÃO)
+    // =========================================================================
+
     @Transactional
     fun criarObra(dto: CriarObraDTO): Obra {
-        val lonBD = BigDecimal.valueOf(dto.longitude)
-        val latBD = BigDecimal.valueOf(dto.latitude)
-        val novaObra = Obra(
+        val obra = Obra(
             nome = dto.nome,
             descricao = dto.descricao,
-            latitude = latBD,
-            longitude = lonBD,
+            endereco = dto.endereco,
+            latitude = dto.latitude,
+            longitude = dto.longitude,
             raAdministrativa = dto.ra,
             orgaoExecutor = dto.orgao,
             status = dto.status,
             percentualConclusao = dto.progresso ?: 0,
             orcamentoPrevisto = dto.orcamentoPrevisto,
-            orcamentoGasto = null,
             empresaContratada = dto.empresaContratada,
             dataInicioPrevista = dto.dataInicio,
-            dataFimPrevista = dto.dataFim,
-            urlDocumento = dto.urlDocumento
+            dataFimPrevista = dto.dataFim
+            // urlDocumento removido conforme a nova Entity
         )
-        return repository.save(novaObra)
+        return repository.save(obra)
     }
 
     @Transactional
-    fun atualizarProgresso(
-        idObra: Long,
-        novoPercentual: Int,
-        novoStatus: StatusObra?,
-        descricao: String?
-    ) {
-        val obra = repository.findById(idObra)
-            .orElseThrow { IllegalArgumentException("Obra não encontrada") }
+    fun atualizarObra(id: Long, request: AtualizarObraRequest) {
+        val obra = repository.findById(id)
+            .orElseThrow { NoSuchElementException("Obra não encontrada") }
 
-        // 1. Guardamos o status antigo antes de mudar
         val statusAnterior = obra.status
+        val percentualAnterior = obra.percentualConclusao
 
-        // 2. Atualizamos a Obra
-        obra.percentualConclusao = novoPercentual
-        if (novoStatus != null) {
-            obra.status = novoStatus
-        }
+        // Atualização de campos básicos
+        request.novoNome?.let { obra.nome = it }
+        request.novaDescricao?.let { obra.descricao = it }
+        request.novoPercentual?.let { obra.percentualConclusao = it }
+        request.novoStatus?.let { obra.status = it }
+        request.novaDataFim?.let { obra.dataFimPrevista = it }
+        request.novoOrcamentoBase?.let { obra.orcamentoPrevisto = it }
+        request.novaEmpresa?.let { obra.empresaContratada = it }
+        request.novaRa?.let { obra.raAdministrativa = it }
 
-        // 3. Criamos o registro de Histórico (Transparência)
+        obra.dataUltimaAtualizacao = LocalDateTime.now()
+
+        // 5. Histórico obrigatório para auditoria
         val historico = ObraHistorico(
             obra = obra,
             statusAnterior = statusAnterior,
             statusNovo = obra.status,
-            descricaoMudanca = descricao ?: "Atualização de progresso para $novoPercentual%",
+            percentualAnterior = percentualAnterior,
+            descricaoMudanca = request.descricaoMudanca,
             dataAtualizacao = LocalDateTime.now()
         )
 
-        // 4. Salvamos tudo
+        historicoRepository.save(historico)
         repository.save(obra)
+    }
+
+    @Transactional
+    fun adicionarAditivo(idObra: Long, dto: CriarAditivoDTO) {
+        val obra = repository.findById(idObra)
+            .orElseThrow { NoSuchElementException("Obra não encontrada") }
+
+        val aditivo = OrcamentoAditivo(
+            obra = obra,
+            valor = dto.valor,
+            dataAprovacao = dto.dataAprovacao,
+            justificativa = dto.justificativa
+        )
+        aditivoRepository.save(aditivo)
+
+        val historico = ObraHistorico(
+            obra = obra,
+            statusAnterior = obra.status,
+            statusNovo = obra.status,
+            descricaoMudanca = "Aditivo Financeiro: R$ ${dto.valor}. Justificativa: ${dto.justificativa}",
+            dataAtualizacao = LocalDateTime.now()
+        )
         historicoRepository.save(historico)
     }
 }

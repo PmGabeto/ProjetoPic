@@ -1,8 +1,8 @@
 package com.example.df.backend.repositories
 
-import com.example.df.backend.entities.Tema
+import com.example.df.backend.entities.OrcamentoAditivo
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.stereotype.Repository
 
 @Repository
-interface TemaRepository : JpaRepository<Tema, Long>
+interface AditivosRepository : JpaRepository<OrcamentoAditivo, Long>

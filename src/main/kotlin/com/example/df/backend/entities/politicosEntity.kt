@@ -14,8 +14,8 @@ data class Politico(
     @Column(name = "ID_POLITICO")
     val id: Long? = null,
 
-    @Column(name = "ID_EXTERNO_CLDF", unique = true, nullable = false)
-    var idExterno: Long?,
+    @Column(name = "publicId", unique = true, nullable = false)
+    var publicId: String,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "TIPO_AUTOR", nullable = false)
@@ -36,16 +36,12 @@ data class Politico(
     @Column(name = "URL_FOTO", length = 1000)
     var urlFoto: String? = null,
 
-    @Column(name = "RA_BASE_ELEITORAL")
-    var raBaseEleitoral: String? = null,
+
 
     @Lob // Indica texto longo (TEXT)
     @Column(name = "BIOGRAFIA_RESUMIDA")
     var biografiaResumida: String? = null,
 
-    @Lob
-    @Column(name = "ENTIDADES_VINCULADAS")
-    var entidadesVinculadas: String? = null
 
 
 ) {

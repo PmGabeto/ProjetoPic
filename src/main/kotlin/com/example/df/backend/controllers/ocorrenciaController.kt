@@ -7,7 +7,6 @@ import com.example.df.backend.enums.StatusOcorrencia
 import com.example.df.backend.enums.TipoProblema
 import com.example.df.backend.services.OcorrenciaService
 import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus

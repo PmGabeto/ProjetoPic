@@ -11,11 +11,16 @@ import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.example.df.backend.services.ProposicaoService
 
 @Tag(name = "4. Políticos", description = "Gestão de representantes públicos e suas proposições")
 @RestController
 @RequestMapping("/api/politicos")
-class PoliticoController(private val service: PoliticoService) {
+class PoliticoController(
+    private val service: PoliticoService,
+    private val proposicaoService: ProposicaoService
+
+    ) {
 
     @Operation(summary = "Listar todos os políticos")
     @GetMapping
@@ -41,7 +46,7 @@ class PoliticoController(private val service: PoliticoService) {
         @PathVariable id: Long,
         @RequestBody @Valid dto: CriarProposicaoDTO
     ): ResponseEntity<Proposicao> {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.adicionarProposicao(id, dto))
+        return ResponseEntity.status(HttpStatus.CREATED).body(proposicaoService.adicionarProposicao(id, dto))
     }
 
     @Operation(summary = "Atualizar dados básicos")
