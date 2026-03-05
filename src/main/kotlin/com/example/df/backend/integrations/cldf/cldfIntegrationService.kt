@@ -79,7 +79,7 @@ class CldfIntegrationService(
             // Se no futuro você quiser filtrar por tipo ou nome, é só adicionar aqui:
             // mapOf("ano" to ano, "tipo" to "PL", "autor" to "Chico")
             val filtroJson = mapOf(
-                "ano" to ano
+                "ano" to ano.toString()
             )
 
             webClient.post() // Garante que é POST
@@ -87,10 +87,10 @@ class CldfIntegrationService(
                     // Mantemos a paginação na URL (padrão do Spring Pageable)
                     .queryParam("page", pagina)
                     .queryParam("size", tamanho)
-                    .queryParam("sort", "dataApresentacao,desc")
+                    .queryParam("sort", "dataApresentacao,DESC")
                     .build()
                 }
-                .bodyValue(filtroJson) // Injeta o JSON no Body da requisição
+                .header("Content-Type", "application/json") // 3. Forçando o formato                .bodyValue(filtroJson) // Injeta o JSON no Body da requisição
                 .retrieve()
                 .bodyToMono<CldfPageResponse<ProposicaoCldfBaseDTO>>()
                 .map { it.content }
