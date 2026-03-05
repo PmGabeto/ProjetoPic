@@ -75,17 +75,27 @@ class CldfIntegrationService(
 
     override fun varrerProposicoesRecentes(ano: Int, pagina: Int, tamanho: Int): List<ProposicaoCldfBaseDTO> {
         return try {
-            webClient.get()
+            // Criamos o objeto que vai virar o JSON no Body
+            // Se no futuro você quiser filtrar por tipo ou nome, é só adicionar aqui:
+            // mapOf("ano" to ano, "tipo" to "PL", "autor" to "Chico")
+            val filtroJson = mapOf(
+                "ano" to ano
+            )
+
+            webClient.post() // Garante que é POST
                 .uri { it.path("/proposicao/filter")
-                    .queryParam("ano", ano)
+                    // Mantemos a paginação na URL (padrão do Spring Pageable)
                     .queryParam("page", pagina)
                     .queryParam("size", tamanho)
-                    .queryParam("sort", "dataApresentacao,desc").build()
+                    .queryParam("sort", "dataApresentacao,desc")
+                    .build()
                 }
+                .bodyValue(filtroJson) // Injeta o JSON no Body da requisição
                 .retrieve()
                 .bodyToMono<CldfPageResponse<ProposicaoCldfBaseDTO>>()
                 .map { it.content }
                 .block() ?: emptyList()
+
         } catch (e: Exception) {
             logger.error("Falha na varredura (Pág $pagina): ${e.message}")
             throw e
