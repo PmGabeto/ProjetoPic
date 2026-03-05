@@ -30,15 +30,22 @@ class ProposicaoService(
     // =========================================================================
     // MOTOR DE VARREDURA RESILIENTE (CARGA AUTOMÁTICA USANDO DTOs DE INTEGRAÇÃO)
     // =========================================================================
+    @Volatile
+    var varreduraAtiva: Boolean = false
 
+    fun pararVarredura() {
+        varreduraAtiva = false
+        logger.info("🛑 Sinal de parada manual enviado para a varredura!")
+    }
     fun sincronizarCargaTotal(ano: Int, paginaInicial: Int = 0) {
+        varreduraAtiva= true
         var pagina = paginaInicial
         val tamanho = 20
 
         logger.info(">>> Iniciando Varredura: Ano $ano, Página $pagina")
 
         // CORREÇÃO: Removida a variável 'continuar' inútil apontada pela IDE
-        while (true) {
+        while (varreduraAtiva) {
             try {
                 val listaBasica = cldfIntegration.varrerProposicoesRecentes(ano, pagina, tamanho)
 

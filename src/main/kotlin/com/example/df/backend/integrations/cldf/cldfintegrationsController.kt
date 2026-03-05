@@ -52,4 +52,16 @@ class CldfIntegrationController(
 
         return ResponseEntity.ok(response)
     }
+    @PostMapping("/proposicoes/parar-varredura")
+    @Operation(
+        summary = "3. PARAR VARREDURA EM ANDAMENTO",
+        description = "Interrompe imediatamente qualquer varredura de proposições que esteja rodando em background."
+    )
+    fun pararVarredura(): ResponseEntity<SincronizacaoResponseDTO> {
+        proposicaoService.pararVarredura()
+
+        return ResponseEntity.ok(SincronizacaoResponseDTO(
+            mensagem = "🛑 Comando de parada enviado! O processo vai parar assim que terminar a página atual."
+        ))
+    }
 }
