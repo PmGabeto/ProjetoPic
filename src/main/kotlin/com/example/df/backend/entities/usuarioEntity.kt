@@ -34,8 +34,9 @@ data class Usuario(
     @Column(name = "DT_NASCIMENTO", nullable = false)
     val dataNascimento: LocalDate,
 
-    @Column(name = "RA_ADMINISTRATIVA", nullable = false)
-    val raAdministrativa: String,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ID_RA", nullable = false)
+    var raAdministrativa: RegiaoAdministrativa,
 
     val cep: String? = null,
     val logradouro: String? = null,

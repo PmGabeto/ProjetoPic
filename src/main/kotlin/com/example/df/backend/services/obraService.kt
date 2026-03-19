@@ -18,7 +18,8 @@ class ObraService(
     private val historicoRepository: ObraHistoricoRepository,
     private val aditivoRepository: AditivosRepository,
     private val fotoRepository: OcorrenciaFotoRepository,
-    private val documentoService: DocumentoService // 1. Injetamos o novo serviço de documentos
+    private val documentoService: DocumentoService,
+    private val raRepo: RegiaoAdministrativaRepository
 ) {
 
     // =========================================================================
@@ -35,7 +36,7 @@ class ObraService(
                 endereco = p.endereco,
                 status = p.status,
                 orgao = p.orgaoExecutor,
-                ra = p.raAdministrativa,
+                ra = p.raAdministrativa.name,
                 progresso = p.progresso
             )
         }
@@ -51,7 +52,7 @@ class ObraService(
             ObraListagemDTO(
                 id = obra.id!!,
                 nome = obra.nome,
-                ra = obra.raAdministrativa,
+                ra = obra.raAdministrativa.nome,
                 orgao = obra.orgaoExecutor,
                 status = obra.status,
                 progresso = obra.percentualConclusao,
@@ -80,7 +81,7 @@ class ObraService(
             nome = obra.nome,
             descricao = obra.descricao,
             endereco = obra.endereco,
-            ra = obra.raAdministrativa,
+            ra = obra.raAdministrativa.nome,
             orgao = obra.orgaoExecutor,
             status = obra.status,
             progresso = obra.percentualConclusao,
@@ -101,13 +102,15 @@ class ObraService(
 
     @Transactional
     fun criarObra(dto: CriarObraDTO): Obra {
+        val raVinculada = raRepo.findByNomeContainingIgnoreCase(dto.ra.trim())
+            ?: throw IllegalArgumentException("A Região Administrativa '${dto.ra}' não foi encontrada.")
         val obra = Obra(
             nome = dto.nome,
             descricao = dto.descricao,
             endereco = dto.endereco,
             latitude = dto.latitude,
             longitude = dto.longitude,
-            raAdministrativa = dto.ra,
+            raAdministrativa = raVinculada,
             orgaoExecutor = dto.orgao,
             status = dto.status,
             percentualConclusao = dto.progresso ?: 0,
@@ -136,8 +139,11 @@ class ObraService(
         request.novaDataFim?.let { obra.dataFimPrevista = it }
         request.novoOrcamentoBase?.let { obra.orcamentoPrevisto = it }
         request.novaEmpresa?.let { obra.empresaContratada = it }
-        request.novaRa?.let { obra.raAdministrativa = it }
-
+        request.novaRa?.let { nomeNovaRa ->
+            val novaRaEntity = raRepo.findByNomeContainingIgnoreCase(nomeNovaRa.trim())
+                ?: throw IllegalArgumentException("A Região Administrativa '$nomeNovaRa' não foi encontrada.")
+            obra.raAdministrativa = novaRaEntity
+        }
         obra.dataUltimaAtualizacao = LocalDateTime.now()
 
         // 5. Histórico obrigatório para auditoria

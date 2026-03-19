@@ -2,7 +2,6 @@ package com.example.df.backend.dtos
 
 import com.example.df.backend.enums.OrgaoExecutor
 import com.example.df.backend.enums.StatusObra
-import com.example.df.backend.enums.RaAdministrativa
 import io.swagger.v3.oas.annotations.media.Schema
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -18,7 +17,7 @@ data class ObraPinDTO(
     val endereco: String?,
     val status: StatusObra,
     val orgao: OrgaoExecutor,
-    val ra: RaAdministrativa,
+    val ra: String,
     val progresso: Int
 )
 
@@ -28,7 +27,7 @@ data class ObraPinDTO(
 data class ObraListagemDTO(
     val id: Long,
     val nome: String,
-    val ra: RaAdministrativa,
+    val ra: String,
     val orgao: OrgaoExecutor,
     val status: StatusObra,
     val progresso: Int,
@@ -43,7 +42,7 @@ data class ObraDetalheDTO(
     val nome: String,
     val descricao: String?,
     val endereco: String?,
-    val ra: RaAdministrativa,
+    val ra: String,
     val orgao: OrgaoExecutor,
     val status: StatusObra,
     val progresso: Int,
@@ -76,7 +75,7 @@ data class AtualizarObraRequest(
     val novaDataFim: LocalDate? = null,
     val novoOrcamentoBase: BigDecimal? = null,
     val novaEmpresa: String? = null,
-    val novaRa: RaAdministrativa? = null
+    val novaRa: String? = null
 )
 
 data class CriarObraDTO(
@@ -85,7 +84,7 @@ data class CriarObraDTO(
     val endereco: String?,
     val latitude: BigDecimal,
     val longitude: BigDecimal,
-    val ra: RaAdministrativa,
+    val ra: String,
     val orgao: OrgaoExecutor,
     val status: StatusObra,
     val progresso: Int? = 0,

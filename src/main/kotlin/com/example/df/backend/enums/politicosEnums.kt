@@ -61,10 +61,7 @@ enum class TipoProjetoLei(
     }
 }
 
-enum class TipoVinculacao {
-    AUTOR_PRINCIPAL,
-    CO_AUTOR,AUTOR
-}
+
 
 enum class StatusPolitico {
     ATIVO,    // Em exercício

@@ -16,10 +16,10 @@ import org.springframework.web.reactive.function.client.bodyToMono
 import reactor.netty.http.client.HttpClient
 import java.time.Duration
 import java.util.concurrent.TimeUnit
-
 @Service
-class CldfIntegrationService(
+open class CldfIntegrationService(
     private val temaRepo: TemaRepository,
+
     webClientBuilder: WebClient.Builder
 ) : CldfInterface {
 
@@ -57,14 +57,20 @@ class CldfIntegrationService(
             logger.error("Erro ao sincronizar temas: ${e.message}")
         }
     }
+@Transactional
+    override fun processarTemasProposicao(temasIds: List<Int>): List<Tema> {
+        // 1. Proteção inicial: Se não vier nenhum tema (lista vazia), retorna lista vazia imediatamente.
+        if (temasIds.isEmpty()) {
+            return emptyList()
+        }
 
-    override fun processarTemasProposicao(idsRaw: String?, nomesRaw: String?): List<Tema> {
-        if (idsRaw.isNullOrBlank() || nomesRaw.isNullOrBlank()) return emptyList()
+        // 2. O Spring Data JPA (temaRepo) geralmente usa 'Long' como chave primária (ID).
+        // Então convertemos a lista de Int que veio da API para uma lista de Long.
+        val idsLong = temasIds.map { it.toLong() }
 
-        val ids = idsRaw.split("#").filter { it.isNotBlank() }.map { it.toLong() }
-        val nomes = nomesRaw.split("#").filter { it.isNotBlank() }
-
-        return ids.zip(nomes).map { (id, nome) -> garantirTemaIndividual(id, nome) }
+        // 3. Busca de Alta Performance: Em vez de fazer um "for" e bater no banco várias vezes,
+        // o findAllById faz um único SELECT buscando todos os temas de uma vez só!
+        return temaRepo.findAllById(idsLong).toList()
     }
 
     override fun garantirTemaIndividual(id: Long, nome: String): Tema {
@@ -73,58 +79,34 @@ class CldfIntegrationService(
         }
     }
 
-    override fun varrerProposicoesRecentes(ano: Int, pagina: Int, tamanho: Int): List<ProposicaoCldfBaseDTO> {
+    override fun varrerProposicoesRecentes(filtros: Map<String, Any>, pagina: Int, tamanho: Int): List<ProposicaoCldfBaseDTO> {
         return try {
-            // Criamos o objeto que vai virar o JSON no Body
-            // Se no futuro você quiser filtrar por tipo ou nome, é só adicionar aqui:
-            // mapOf("ano" to ano, "tipo" to "PL", "autor" to "Chico")
-            val filtroJson = mapOf(
-                "ano" to ano.toString()
-            )
-
-            webClient.post() // Garante que é POST
-                .uri { it.path("/proposicao/filter")
-                    // Mantemos a paginação na URL (padrão do Spring Pageable)
-                    .queryParam("page", pagina)
-                    .queryParam("size", tamanho)
-                    .build()
-                }
-                .header("Content-Type", "application/json") // 3. Forçando o formato                .bodyValue(filtroJson) // Injeta o JSON no Body da requisição
+            webClient.post()
+                .uri("/proposicao/filter?size=$tamanho&page=$pagina")
+                .header("Content-Type", "application/json")
+                .bodyValue(filtros) // <--- O mapa de filtros entra direto aqui!
                 .retrieve()
                 .bodyToMono<CldfPageResponse<ProposicaoCldfBaseDTO>>()
                 .map { it.content }
                 .block() ?: emptyList()
-
         } catch (e: Exception) {
-            logger.error("Falha na varredura (Pág $pagina): ${e.message}")
-            throw e
+            logger.error("Erro na varredura com filtros $filtros, pág $pagina: ${e.message}")
+            emptyList()
         }
     }
+
 
     override fun buscarDetalhesCompletos(publicId: String): ProposicaoCldfCompletaDTO? {
         return try {
             webClient.get()
-                .uri("/proposicao/$publicId/detalhe")
+                .uri("/proposicao/$publicId")
                 .retrieve()
-                .bodyToMono<ProposicaoCldfCompletaDTO>()
+                .bodyToMono<CldfDetalheResponse>() // Lê o envelope que definimos no DTO
+                .map { it.proposicao } // Extrai a proposição completa (já com o histórico lá dentro!)
                 .block()
         } catch (e: Exception) {
-            logger.error("Erro ao buscar detalhes da proposição $publicId: ${e.message}")
+            logger.error("Erro ao buscar detalhes da proposicao $publicId: ${e.message}")
             null
-        }
-    }
-
-    override fun buscarHistorico(publicId: String): List<HistoricoCldfDTO> {
-        return try {
-            webClient.post()
-                .uri("/historico-proposicao/$publicId?sort=base.dataHistorico,DESC")
-                .retrieve()
-                .bodyToMono<CldfPageResponse<HistoricoCldfDTO>>()
-                .map { it.content }
-                .block() ?: emptyList()
-        } catch (e: Exception) {
-            logger.error("Erro ao buscar histórico $publicId: ${e.message}")
-            emptyList()
         }
     }
 
@@ -132,13 +114,47 @@ class CldfIntegrationService(
         return try {
             webClient.post()
                 .uri("/proposicao/$publicId/documento/ativas/order-by-pageable")
+                .header("Content-Type", "application/json") // Vacina contra erro 400
+                .header("Accept", "*/*")
+                .bodyValue(emptyMap<String, Any>()) // Manda um JSON vazio: {}
                 .retrieve()
+                // 1. Lê a "capa" da resposta paginada
                 .bodyToMono<CldfPageResponse<DocumentoCldfDTO>>()
+                // 2. Extrai a lista do array "content"
                 .map { it.content }
                 .block() ?: emptyList()
         } catch (e: Exception) {
             logger.error("Erro ao buscar documentos $publicId: ${e.message}")
             emptyList()
+        }
+    }
+    override fun buscarHtmlDocumento(idProposicao: String, idDocumento: String): String? {
+        return try {
+            webClient.get() // Atenção aqui: o PDF era POST, o HTML é GET!
+                .uri("/proposicao/$idProposicao/documento/$idDocumento/html")
+                .header("Accept", "text/html,application/xhtml+xml") // Pedimos especificamente por HTML
+                .retrieve()
+                .bodyToMono<String>() // Puxa o corpo da resposta como uma String gigante
+                .block()
+        } catch (e: Exception) {
+            logger.error("Erro ao buscar HTML do documento $idDocumento da proposição $idProposicao: ${e.message}")
+            null
+        }
+    }
+
+    override fun baixarDocumentos(idProposicao: String, idDocumento: String): ByteArray? {
+        return try {
+            webClient.post()
+                .uri("/proposicao/exportar/$idProposicao/pdf")
+                .header("Content-Type", "application/json")
+                // Converte a String de volta para Long apenas para o JSON da CLDF entender
+                .bodyValue(listOf(idDocumento.toLong()))
+                .retrieve()
+                .bodyToMono<ByteArray>()
+                .block()
+        } catch (e: Exception) {
+            logger.error("Erro ao descarregar PDF do documento $idDocumento da proposição $idProposicao: ${e.message}")
+            null
         }
     }
 }

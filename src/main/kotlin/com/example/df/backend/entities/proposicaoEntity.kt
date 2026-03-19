@@ -1,5 +1,5 @@
 package com.example.df.backend.entities
-
+import com.example.df.backend.entities.RegiaoAdministrativa
 import com.example.df.backend.enums.TipoProjetoLei
 import jakarta.persistence.*
 import java.time.LocalDate
@@ -13,20 +13,20 @@ data class Proposicao(
     val id: Long? = null,
 
     @Column(name = "publicId", unique = true, nullable = false)
-    val publicId: String,
+    var publicId: String,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "TIPO", nullable = false)
-    val tipo: TipoProjetoLei,
+    var tipo: TipoProjetoLei,
 
     @Column(name = "NUMERO_PROCESSO", nullable = false)
-    val numeroProcesso: String,
+    var numeroProcesso: String,
 
     @Column(name = "NUMERO_DEFINITIVO")
     val numeroDefinitivo: String? = null,
 
     @Column(name = "TITULO", length = 1000, nullable = false)
-    val titulo: String,
+    var titulo: String,
 
     @Lob
     @Column(name = "EMENTA")
@@ -35,17 +35,22 @@ data class Proposicao(
     @Column(name = "STATUS_TRAMITACAO")
     var statusTramitacao: String? = null,
 
-    @Column(name = "REGIAO_ADMINISTRATIVA")
-    var regiaoAdministrativa: String? = null,
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "PROPOSICAO_RA", // Nome da tabela auxiliar no banco
+        joinColumns = [JoinColumn(name = "PROPOSICAO_ID")], // Chave da proposição
+        inverseJoinColumns = [JoinColumn(name = "RA_ID")] // Chave da RA
+    )
+    var regioesAdministrativas: MutableSet<RegiaoAdministrativa> = mutableSetOf(),
 
-    @Column(name = "URGENCIA", nullable = false)
+    @Column(name = "URGENCIA", nullable = true)
     var regimeUrgencia: Boolean = false,
 
     @Column(name = "EXCLUIDO", nullable = false)
     var excluido: Boolean = false,
 
     @Column(name = "DT_APRESENTACAO", nullable = false)
-    val dataApresentacao: LocalDate,
+    var dataApresentacao: LocalDate,
 
     @Column(name = "DT_LIMITE")
     val dataLimite: LocalDate? = null,
@@ -54,7 +59,7 @@ data class Proposicao(
     val idUnidadeGeradora: Long? = null,
 
 @Column(name = "LINK_COMPLETO")
-val linkCompleto: String?,
+    var linkCompleto: String?,
     // Relacionamento com Tema para filtros dinâmicos
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(

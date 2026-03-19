@@ -1,6 +1,5 @@
 package com.example.df.backend.entities
 
-import com.example.df.backend.enums.TipoVinculacao
 import com.fasterxml.jackson.annotation.JsonIgnore
 import jakarta.persistence.*
 import java.io.Serializable
@@ -12,9 +11,6 @@ class Autoria(
     @EmbeddedId
     val id: AutoriaId = AutoriaId(),
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "TIPO_VINCULACAO", nullable = true)
-    val tipoVinculacao: TipoVinculacao? = TipoVinculacao.AUTOR, // AUTOR_PRINCIPAL ou CO_AUTOR
 
     // --- LADO DO POLÍTICO ---
     @ManyToOne(fetch = FetchType.LAZY)

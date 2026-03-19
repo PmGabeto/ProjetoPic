@@ -11,8 +11,7 @@ import java.time.LocalDateTime
 interface HistoricoRepository : JpaRepository<ProposicaoHistorico, Long> {
 
     // Usado no buscarDetalhe() para listar a linha do tempo
-    fun findByProjetoOrderByDataEventoDesc(projeto: Proposicao): List<ProposicaoHistorico>
-
+    fun findByProjetoIdOrderByDataEventoDesc(projetoId: Long): List<ProposicaoHistorico>
     // Usado na sincronização incremental: Verifica se aquele exato evento já foi salvo
     fun existsByProjetoAndDataEventoAndFaseTramitacao(
         projeto: Proposicao, dataEvento: LocalDateTime, faseTramitacao: String

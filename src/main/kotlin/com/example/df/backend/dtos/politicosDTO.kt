@@ -32,8 +32,8 @@ data class TipoProposicaoDTO(
     val sigla: String,
     @field:Schema(description = "Nome completo do tipo", example = "Projeto de Lei")
     val nome: String,
-    @field:Schema(description = "Explicação fácil para o cidadão", example = "Criação de novas leis para o DF.")
-    val descricaoPedagogica: String
+  //  @field:Schema(description = "Explicação fácil para o cidadão", example = "Criação de novas leis para o DF.")
+    // val descricaoPedagogica: String
 )
 // Dtos Arquivos Documentos
 data class DocumentoDTO(
@@ -51,7 +51,7 @@ data class DocumentoDTO(
 
 data class HistoricoDTO(
     @field:Schema(description = "Data do evento", example = "2024-02-15")
-    val data: LocalDate,
+    val data: LocalDateTime,
     @field:Schema(description = "Fase atual da tramitação", example = "Aguardando Votação")
     val fase: String,
     @field:Schema(description = "Unidade que está avaliando", example = "Plenário")
@@ -66,7 +66,7 @@ data class PoliticoResumoDTO(
     @field:Schema(description = "ID interno", example = "1")
     val id: Long,
     @field:Schema(description = "ID na CLDF", example = "12345")
-    val publicId:String,
+    val publicId: String,
     @field:Schema(description = "Nome público", example = "João Deputado")
     val nome: String,
     @field:Schema(description = "Partido atual", example = "PDB")
@@ -77,6 +77,7 @@ data class PoliticoResumoDTO(
     val tipoAutor: TipoAutor? = null,
     @field:Schema(description = "Foto oficial", example = "https://link.com/foto.jpg")
     val foto: String?
+
 )
 
 data class PoliticoDetalheDTO(
@@ -131,8 +132,6 @@ data class ProposicaoResumoDTO(
     @field:Schema(description = "Data de apresentação da proposição", example = "2024-02-27")
     val data: LocalDate,
 
-    @field:Schema(description = "Tipo de vinculação do autor (se for autor principal ou coautor)", example = "AUTOR_PRINCIPAL")
-    val minhaVinculacao: TipoVinculacao?,
     val linkCompleto: String?
 )
 data class ProposicaoDetalheDTO(
@@ -161,7 +160,7 @@ data class ProposicaoDetalheDTO(
     val statusTramitacao: String?,
 
     @field:Schema(description = "Região Administrativa alvo do projeto (se for específico)", example = "PLANO_PILOTO")
-    val regiaoAdministrativa: String?,
+    val regiaoAdministrativa: List<String>,
 
     @field:Schema(description = "Indica se o projeto tramita em regime de urgência", example = "false")
     val regimeUrgencia: Boolean,
@@ -250,8 +249,7 @@ data class CriarProposicaoDTO(
 val linkCompleto : String?,
 
 
-    @field:Schema(description = "Tipo de autoria do político ao cadastrar", example = "AUTOR_PRINCIPAL")
-    val tipoVinculacao: TipoVinculacao
+
 )
 
 data class NovoHistoricoDTO(

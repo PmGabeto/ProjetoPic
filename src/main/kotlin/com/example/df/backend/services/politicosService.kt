@@ -52,11 +52,11 @@ class PoliticoService(
         return politicoRepo.findAll().map { p ->
             PoliticoResumoDTO(
                 id = p.id!!,
+                publicId = p.publicId,
                 nome = p.nomeUrna ?: p.nomeCompleto,
                 partido = p.partidoAtual,
                 status = p.status,
                 foto = p.urlFoto,
-                publicId = p.publicId
             )
         }
     }
@@ -81,10 +81,9 @@ class PoliticoService(
                 status = prop.statusTramitacao ?: "Aguardando",
                 data = prop.dataApresentacao,
                 numero = prop.numeroProcesso,
-                tipo = TipoProposicaoDTO(prop.tipo.name, prop.tipo.name, ""),
+                tipo = TipoProposicaoDTO(prop.tipo.name, prop.tipo.name),
                 linkCompleto = prop.linkCompleto,
-                minhaVinculacao = null,
-                tema = prop.temas.map { TemaDTO(it.id!!, it.nome) }
+                tema = prop.temas.map { TemaDTO(it.id, it.nome) }
             )
         }
 

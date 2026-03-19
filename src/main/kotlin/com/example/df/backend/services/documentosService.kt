@@ -40,7 +40,8 @@ class DocumentoService(
         tipoDocumento: String,
         autor: String?,
         raOuContexto: String,
-        publicIdSugerido: String? = null // Se vier da CLDF e você baixar o PDF, passa o ID aqui
+        publicIdSugerido: String? = null, // Se vier da CLDF e você baixar o PDF, passa o ID aqui
+
     ): DocumentosArquivos {
 
         // A MÁGICA DO ID: Usa o ID sugerido (ex: "185") OU gera um UUID aleatório de 12 chars
@@ -68,7 +69,8 @@ class DocumentoService(
             tipoRelacionado = tipoRelacionado.uppercase(),
             idRelacionado = idRelacionado,
             autor = autor,
-            dataCadastro = LocalDateTime.now()
+            dataCadastro = LocalDateTime.now(),
+            validoDesde = LocalDateTime.now()
         )
 
         return repository.save(novoDoc)
@@ -85,7 +87,9 @@ class DocumentoService(
         idRelacionado: Long,
         nomeExibicao: String,
         tipoDocumento: String,
-        autor: String?
+        autor: String?,
+        dataCadastroReal: LocalDateTime? = null,
+        validoDesdeReal: LocalDateTime? = null
     ): DocumentosArquivos {
 
         val novoDoc = DocumentosArquivos(
@@ -99,7 +103,8 @@ class DocumentoService(
             tipoRelacionado = tipoRelacionado.uppercase(),
             idRelacionado = idRelacionado,
             autor = autor,
-            dataCadastro = LocalDateTime.now()
+            validoDesde = validoDesdeReal ?: LocalDateTime.now(),
+            dataCadastro = dataCadastroReal ?: LocalDateTime.now()
         )
 
         return repository.save(novoDoc)
@@ -125,12 +130,15 @@ class DocumentoService(
 
             DocumentoResponseDTO(
                 id = doc.id!!,
+                publicId = doc.publicId, // ID vital para a CLDF
+                tipoRelacionado = doc.tipoRelacionado, // "PROPOSICAO" ou "OBRA"
                 nomeExibicao = doc.nomeExibicao,
                 tipoDocumento = doc.tipoDocumento,
                 urlDownload = url,
-                extensao = doc.nomeStorage.substringAfterLast(".", "pdf"),
+                extensao = doc.nomeStorage?.substringAfterLast(".", "pdf") ?: "pdf",
                 dataCadastro = doc.dataCadastro,
-                autor = doc.autor
+                autor = doc.autor,
+                validoDesde = doc.validoDesde
             )
         }
     }

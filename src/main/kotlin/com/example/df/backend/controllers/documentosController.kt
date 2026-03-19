@@ -53,7 +53,8 @@ class DocumentoController(
         @RequestParam(value = "autor", required = false) autor: String?,
         @Parameter(description = "RA ou Contexto para o nome do arquivo")
         @RequestParam("raOuContexto") raOuContexto: String,
-        @Parameter(description = "Deixe nulo para gerar UUID, ou passe ID para sobrescrever") @RequestParam(value = "publicIdSugerido", required = false) publicIdSugerido: String?
+        @Parameter(description = "Deixe nulo para gerar UUID, ou passe ID para sobrescrever")
+        @RequestParam(value = "publicIdSugerido", required = false) publicIdSugerido: String?
     ): ResponseEntity<DocumentoResponseDTO> {
 
         val docSalvo = service.fazerUpload(
@@ -69,17 +70,19 @@ class DocumentoController(
 
         val responseDTO = DocumentoResponseDTO(
             id = docSalvo.id!!,
+            publicId = docSalvo.publicId,
+            tipoRelacionado = docSalvo.tipoRelacionado,
             nomeExibicao = docSalvo.nomeExibicao,
             tipoDocumento = docSalvo.tipoDocumento,
             urlDownload = "/api/documentos/v/${docSalvo.publicId}",
-            extensao = docSalvo.nomeStorage.substringAfterLast(".", "pdf"),
+            extensao = docSalvo.nomeStorage?.substringAfterLast(".", "pdf") ?: "pdf",
             dataCadastro = docSalvo.dataCadastro,
+            validoDesde = docSalvo.validoDesde,
             autor = docSalvo.autor
         )
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(responseDTO)
+        return ResponseEntity.ok(responseDTO)
     }
-
     // =========================================================================
     // 2. REGISTRO DE LINK EXTERNO (CLDF)
     // =========================================================================
@@ -109,7 +112,10 @@ class DocumentoController(
             urlDownload = linkDireto, // Vai direto para a fonte original
             extensao = "pdf",
             dataCadastro = docSalvo.dataCadastro,
-            autor = docSalvo.autor
+            autor = docSalvo.autor,
+            validoDesde = docSalvo.validoDesde,
+            publicId = docSalvo.publicId,
+            tipoRelacionado = docSalvo.tipoRelacionado
         )
 
         return ResponseEntity.status(HttpStatus.CREATED).body(responseDTO)
@@ -141,15 +147,21 @@ class DocumentoController(
     fun baixarDocumento(@PathVariable publicId: String): ResponseEntity<Resource> {
         val doc = service.buscarPorPublicId(publicId)
 
-        // Se for um link externo que bateu aqui por engano, redirecionamos para o link correto
+        // Se for um link externo antigo que bateu aqui por engano, redirecionamos para o link correto
         if (doc.linkDireto != null) {
             return ResponseEntity.status(HttpStatus.FOUND)
                 .location(URI.create(doc.linkDireto))
                 .build()
         }
 
-        // Busca o arquivo físico na VPS
-        val filePath: Path = Paths.get("$storageRoot/documentos").resolve(doc.nomeStorage).normalize()
+        // NOVA PROTEÇÃO: Verifica se é um documento virtual (ex: CLDF) sem arquivo físico
+        val nomeFisico = doc.nomeStorage
+        if (nomeFisico == null) {
+            return ResponseEntity.notFound().build()
+        }
+
+        // Busca o arquivo físico na VPS de forma segura
+        val filePath: Path = Paths.get("$storageRoot/documentos").resolve(nomeFisico).normalize()
         val resource: Resource = UrlResource(filePath.toUri())
 
         if (!resource.exists() || !resource.isReadable) {
@@ -157,7 +169,7 @@ class DocumentoController(
         }
 
         // MÁSCARA: O arquivo no servidor se chama "OBRA_2024_...pdf", mas o usuário baixa como "Edital.pdf"
-        val extensao = doc.nomeStorage.substringAfterLast(".", "pdf")
+        val extensao = nomeFisico.substringAfterLast(".", "pdf")
         val nomeMascarado = "${doc.nomeExibicao.replace(" ", "_")}.$extensao"
 
         // Usamos "inline" para abrir no navegador, ou "attachment" para forçar o download.
@@ -167,7 +179,6 @@ class DocumentoController(
             .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"$nomeMascarado\"")
             .body(resource)
     }
-
     // =========================================================================
     // 5. DELETAR
     // =========================================================================

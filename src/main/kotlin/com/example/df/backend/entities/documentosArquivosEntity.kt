@@ -9,7 +9,7 @@ data class DocumentosArquivos(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "ID_DOCUMENTO")
-    val id: Long? = null,
+    val id: Long? = null ,
     @Column(name = "publicId", unique = true, nullable = false)
     val publicId: String,
     // Mantemos para compatibilidade com a CLDF, mas deixamos opcional
@@ -22,7 +22,7 @@ data class DocumentosArquivos(
     val nomeExibicao: String, // Nome que o usuário vê
 
     @Column(name = "NOME_STORAGE", nullable = false, unique = true)
-    val nomeStorage: String, // Nome único do arquivo no seu servidor (ex: UUID.pdf)
+    val nomeStorage: String?=null, // Nome único do arquivo no seu servidor (ex: UUID.pdf)
 
     @Column(name = "LINK_DIRETO", length = 2000)
     val linkDireto: String? = null, // Caso o arquivo seja externo (como o da CLDF)
@@ -38,8 +38,11 @@ data class DocumentosArquivos(
     val idRelacionado: Long, // ID da Obra ou ID da Proposição
 
     @Column(name = "DATA_CADASTRO")
-    val dataCadastro: LocalDateTime = LocalDateTime.now(),
+    val dataCadastro: LocalDateTime,
 
     @Column(name = "AUTOR")
-    val autor: String? = null
+    val autor: String? = null,
+
+    @Column(name = "VALIDO_DESDE")
+    val validoDesde: LocalDateTime
 )

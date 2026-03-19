@@ -4,6 +4,7 @@ import com.example.df.backend.dtos.AlterarSenhaDTO
 import com.example.df.backend.dtos.AtualizarPerfilDTO
 import com.example.df.backend.dtos.RegistroDTO
 import com.example.df.backend.entities.Usuario
+import com.example.df.backend.repositories.RegiaoAdministrativaRepository
 import com.example.df.backend.repositories.UsuarioRepository
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
@@ -14,7 +15,8 @@ import org.springframework.web.multipart.MultipartFile
 class UsuarioService(
     private val usuarioRepository: UsuarioRepository,
     private val passwordEncoder: PasswordEncoder,
-    private val fotoService: FotoService
+    private val fotoService: FotoService,
+    private val raRepo: RegiaoAdministrativaRepository
 ) {
 
     @Transactional
@@ -24,7 +26,8 @@ class UsuarioService(
         if (!isCpfValido(cpfLimpo)) throw IllegalArgumentException("CPF inválido.")
         if (usuarioRepository.existsByEmail(dto.email)) throw IllegalArgumentException("E-mail já cadastrado.")
         if (usuarioRepository.existsByCpf(cpfLimpo)) throw IllegalArgumentException("CPF já cadastrado.")
-
+        val raVinculada = raRepo.findByNomeContainingIgnoreCase(dto.raAdministrativa.trim())
+            ?: throw IllegalArgumentException("A Região Administrativa '${dto.raAdministrativa}' não foi encontrada no sistema.")
         val novoUsuario = Usuario(
             cpf = cpfLimpo,
             nomeCompleto = dto.nomeCompleto,
@@ -32,7 +35,14 @@ class UsuarioService(
             senhaHash = passwordEncoder.encode(dto.senha),
             dataNascimento = dto.dataNascimento,
             telefone = dto.telefone,
-            raAdministrativa = dto.raAdministrativa
+            raAdministrativa = raVinculada,
+            cep = dto.cep,
+            logradouro =  dto.logradouro,
+             numero= dto.numero,
+             bairro= dto.bairro,
+             cidade  = dto.cidade,
+            urlFoto = dto.urlFoto,
+            perfil = dto.perfil
         )
 
         return usuarioRepository.save(novoUsuario)

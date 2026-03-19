@@ -40,14 +40,7 @@ class PoliticoController(
         return ResponseEntity.status(HttpStatus.CREATED).body(service.criarPolitico(dto))
     }
 
-    @Operation(summary = "Adicionar nova lei/proposição")
-    @PostMapping("/{id}/proposicoes")
-    fun adicionarProposicao(
-        @PathVariable id: Long,
-        @RequestBody @Valid dto: CriarProposicaoDTO
-    ): ResponseEntity<Proposicao> {
-        return ResponseEntity.status(HttpStatus.CREATED).body(proposicaoService.adicionarProposicao(id, dto))
-    }
+
 
     @Operation(summary = "Atualizar dados básicos")
     @PutMapping("/{id}")

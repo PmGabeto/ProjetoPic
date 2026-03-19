@@ -31,9 +31,9 @@ data class Obra(
     @Column(precision = 10, scale = 7)
     val longitude: BigDecimal? = null,
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "RA_ADMINISTRATIVA", nullable = false)
-    var raAdministrativa: RaAdministrativa,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ID_RA", nullable = false)
+    var raAdministrativa: RegiaoAdministrativa,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "ORGAO_EXECUTOR")

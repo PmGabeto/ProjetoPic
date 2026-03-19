@@ -7,12 +7,15 @@ import java.time.LocalDateTime
 // ==========================================
 data class DocumentoResponseDTO(
     val id: Long,
+    val publicId: String,
+    val tipoRelacionado: String,
     val nomeExibicao: String,
     val tipoDocumento: String, // Ex: "Edital", "Projeto de Lei", "Contrato"
-    val urlDownload: String,   // Rota da API para baixar o arquivo interno ou link externo
+    val urlDownload: String?,   // Rota da API para baixar o arquivo interno ou link externo
     val extensao: String?,     // pdf, docx, etc.
     val dataCadastro: LocalDateTime,
-    val autor: String?
+    val autor: String?,
+    val validoDesde :LocalDateTime
 )
 
 // ==========================================
