@@ -14,7 +14,7 @@ interface ObraRepository : JpaRepository<Obra, Long> {
     // Busca para a Lista Lateral com filtros dinâmicos
     @Query("""
         SELECT o FROM Obra o 
-        WHERE (:ra IS NULL OR o.raAdministrativa = :ra)
+        WHERE (:raId IS NULL OR o.raAdministrativa.id = :raId)
         AND (:orgao IS NULL OR o.orgaoExecutor = :orgao)
         AND (:status IS NULL OR o.status IN :status)
         ORDER BY 
@@ -22,7 +22,7 @@ interface ObraRepository : JpaRepository<Obra, Long> {
             o.nome ASC
     """)
     fun buscarComFiltros(
-        ra: RaAdministrativa?,
+        raId: Long?,
         orgao: OrgaoExecutor?,
         status: List<StatusObra>?
     ): List<Obra>

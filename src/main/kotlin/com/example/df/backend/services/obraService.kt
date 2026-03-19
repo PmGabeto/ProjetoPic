@@ -43,12 +43,12 @@ class ObraService(
     }
 
     fun listarObras(
-        ra: RaAdministrativa?,
+        raId: Long?,
         orgao: OrgaoExecutor?,
         status: List<StatusObra>?
     ): List<ObraListagemDTO> {
-        // Aqui usamos o método 'buscarComFiltros' que está no seu ObraRepository
-        return repository.buscarComFiltros(ra, orgao, status).map { obra ->
+        // Função aninhada foi removida. Retorno direto e limpo:
+        return repository.buscarComFiltros(raId, orgao, status).map { obra ->
             ObraListagemDTO(
                 id = obra.id!!,
                 nome = obra.nome,

@@ -1,7 +1,9 @@
 package com.example.df.backend.entities
+
 import com.example.df.backend.enums.StatusObra
 import jakarta.persistence.*
 import java.time.LocalDateTime
+
 @Entity
 @Table(name = "OBRAS_HISTORICO")
 data class ObraHistorico(
@@ -12,12 +14,14 @@ data class ObraHistorico(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ID_OBRA", nullable = false)
     val obra: Obra,
+
     @Enumerated(EnumType.STRING)
     @Column(name = "STATUS_ANTERIOR")
     val statusAnterior: StatusObra,
-@Enumerated(EnumType.STRING)
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "STATUS_NOVO")
-    val statusNovo : StatusObra,
+    val statusNovo: StatusObra,
 
     @Column(name = "PERCENTUAL_ANTERIOR")
     val percentualAnterior: Int? = null,

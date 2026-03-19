@@ -2,9 +2,10 @@ package com.example.df.backend.controllers
 
 import com.example.df.backend.dtos.*
 import com.example.df.backend.entities.Obra
+import com.example.df.backend.repositories.RegiaoAdministrativaRepository
+import com.example.df.backend.entities.RegiaoAdministrativa
 import com.example.df.backend.enums.OrgaoExecutor
 import com.example.df.backend.enums.StatusObra
-import com.example.df.backend.enums.RaAdministrativa
 import com.example.df.backend.services.ObraService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -16,7 +17,8 @@ import org.springframework.web.bind.annotation.*
 @RestController
 @RequestMapping("/api/obras")
 class ObraController(
-    private val service: ObraService
+    private val service: ObraService,
+    private val raRepo: RegiaoAdministrativaRepository
 ) {
 
     @Operation(summary = "Listar pins para o mapa")
@@ -30,11 +32,11 @@ class ObraController(
     @Operation(summary = "Listar obras com filtros para a lateral")
     @GetMapping
     fun listarObras(
-        @RequestParam(required = false) ra: RaAdministrativa?,
+        @RequestParam(required = false) raId: Long?,
         @RequestParam(required = false) orgao: OrgaoExecutor?,
         @RequestParam(required = false) status: List<StatusObra>?
-    ): ResponseEntity<List<ObraListagemDTO>> {
-        return ResponseEntity.ok(service.listarObras(ra, orgao, status))
+    ): ResponseEntity<List<ObraListagemDTO>> { // <-- MUDAR AQUI PARA ObraListagemDTO
+        return ResponseEntity.ok(service.listarObras(raId, orgao, status))
     }
 
     @Operation(summary = "Detalhes completos de uma obra")
@@ -71,8 +73,8 @@ class ObraController(
 
     @Operation(summary = "Listar todas as RAs")
     @GetMapping("/aux/regioes")
-    fun listarRegioes(): ResponseEntity<Array<RaAdministrativa>> {
-        return ResponseEntity.ok(RaAdministrativa.entries.toTypedArray())
+    fun listarRegioes(): ResponseEntity<List<RegiaoAdministrativa>> {
+        return ResponseEntity.ok(raRepo.findAll()) // Agora o raRepo funciona perfeitamente!
     }
 
     @Operation(summary = "Listar todos os Status possíveis")

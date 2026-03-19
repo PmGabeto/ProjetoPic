@@ -1,7 +1,6 @@
 package com.example.df.backend.entities
 
 import com.example.df.backend.enums.OrgaoExecutor
-import com.example.df.backend.enums.RaAdministrativa
 import com.example.df.backend.enums.StatusObra
 import jakarta.persistence.*
 import java.math.BigDecimal
