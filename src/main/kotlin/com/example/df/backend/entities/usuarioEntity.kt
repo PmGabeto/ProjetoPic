@@ -37,15 +37,23 @@ data class Usuario(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ID_RA", nullable = false)
     var raAdministrativa: RegiaoAdministrativa,
-
+    @Column(name="CEP", nullable = true)
     val cep: String? = null,
+    @Column(name="LOGRADOURO", nullable = true)
     val logradouro: String? = null,
+    @Column(name="NUMERO", nullable = true)
     val numero: String? = null,
+    @Column(name="BAIRRO", nullable = true)
     val bairro: String? = null,
+    @Column(name="CIDADE", nullable = true)
     val cidade: String? = null,
+    @Column(name="COMPLEMENTO", nullable = true)
     val complemento: String? = null,
+    @Column(name="LATITUDE_RESIDENCIA", nullable = true)
     val latitudeResidencia: Double? = null,
+    @Column(name="LONGITUDE_RESIDENCIA", nullable = true)
     val longitudeResidencia: Double? = null,
+    @Column(name="RAIO_INTERESSE_NOTIF_KM", nullable = true)
     val raioInteresseNotifKm: Double = 5.0,
 
     @Column(name = "SENHA_HASH", nullable = false)

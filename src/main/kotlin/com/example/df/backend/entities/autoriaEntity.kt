@@ -11,7 +11,8 @@ class Autoria(
     @EmbeddedId
     val id: AutoriaId = AutoriaId(),
 
-
+    @Column(name = "tipo_vinculacao", nullable = false)
+    var tipoVinculacao: String = "AUTOR",
     // --- LADO DO POLÍTICO ---
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("idPolitico") // Conecta com o campo da chave composta

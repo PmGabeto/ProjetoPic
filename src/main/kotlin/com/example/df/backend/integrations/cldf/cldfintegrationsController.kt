@@ -4,8 +4,6 @@ import com.example.df.backend.dtos.SincronizacaoResponseDTO
 import com.example.df.backend.services.ProposicaoService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
-import org.springframework.http.HttpHeaders
-import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import kotlin.concurrent.thread // Importante para rodar em background
@@ -66,42 +64,5 @@ class CldfIntegrationController(
             mensagem = "🛑 Comando de parada enviado! O processo vai parar assim que terminar a página atual."
         ))
     }
-    @GetMapping("/download-pdf/{idProposicao}/{idDocumento}")
-    @Operation(summary = "4. Baixar PDF Original", description = "Busca o PDF diretamente da CLDF usando os Public IDs")
-    fun downloadPdf(
-        @PathVariable idProposicao: String,
-        @PathVariable idDocumento: String
-    ): ResponseEntity<ByteArray> {
 
-        val pdfBytes = cldfService.baixarDocumentos(idProposicao, idDocumento)
-
-        return if (pdfBytes != null && pdfBytes.isNotEmpty()) {
-            ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_PDF)
-                // Faz o navegador abrir o download com um nome sugestivo
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"doc_cldf_${idDocumento}.pdf\"")
-                .body(pdfBytes)
-        } else {
-            ResponseEntity.noContent().build()
-        }
-    }
-    @GetMapping("/documento-html/{idProposicao}/{idDocumento}", produces = [MediaType.TEXT_HTML_VALUE])
-    @Operation(
-        summary = "5. Visualizar HTML do Documento",
-        description = "Retorna o HTML puro do documento diretamente da CLDF (Proxy). Ideal para renderizar nativamente no ecrã da aplicação."
-    )
-    fun visualizarHtml(
-        @PathVariable idProposicao: String,
-        @PathVariable idDocumento: String
-    ): ResponseEntity<String> {
-
-        val html = cldfService.buscarHtmlDocumento(idProposicao, idDocumento)
-
-        return if (!html.isNullOrBlank()) {
-            ResponseEntity.ok(html)
-        } else {
-            // Retorna erro 404 caso a CLDF não encontre o documento ou ele não exista
-            ResponseEntity.notFound().build()
-        }
-    }
 }

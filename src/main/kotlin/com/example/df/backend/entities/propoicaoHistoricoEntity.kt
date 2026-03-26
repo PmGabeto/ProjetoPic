@@ -24,8 +24,8 @@ val publicId: String,
     @Column(name = "UNIDADE_RESPONSAVEL")
     val unidadeResponsavel: String? = null, // Ex: "Comissão de Constituição e Justiça"
 
-    @Lob
-    @Column(name = "DESCRICAO")
+
+    @Column(name = "DESCRICAO", columnDefinition = "TEXT")
     val descricao: String? = null,
 
     @ManyToOne(fetch = FetchType.LAZY)

@@ -19,8 +19,8 @@ data class CldfPageResponse<T>(
 
 //* proposicao/detalhes
 data class CldfDetalheResponse(
-    @field:JsonProperty("proposicao")
-    val proposicao: ProposicaoCldfCompletaDTO
+    val proposicao: ProposicaoCldfCompletaDTO?,
+    val historico: List<HistoricoCldfDTO> = emptyList()
 )
 //! DTOS auxiliares que são de listas .
 // * AUTOR (Objeto interno da Proposição)
@@ -97,6 +97,7 @@ data class ProposicaoCldfCompletaDTO(
     @field:JsonProperty("autores") val autores: List<AutorCldfDTO>? = null,
     @field:JsonProperty("excluido") val excluido : Boolean? = null ,
     @field:JsonProperty("tipoAutor") val tipoAutor: String? = null,
+    @field:JsonProperty("numeroDefinitivo") val numeroDefinitivo: String? = null,
     @field:JsonProperty("idUnidadeGeradora") val idUnidadeGeradora: Long? = null, // antes de ativar preciso saber de onde ver esse id não são todos que aparecem no autor/listar
     @field:JsonProperty("historico") val historico : List<HistoricoCldfDTO>? =emptyList()
 

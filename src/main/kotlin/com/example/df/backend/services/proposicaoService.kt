@@ -26,7 +26,9 @@ open class ProposicaoService(
     private val historicoRepo: HistoricoRepository,
     private val documentoRepo: DocumentoRepository
 ) {
-
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private lateinit var self: ProposicaoService
     private val logger = LoggerFactory.getLogger(ProposicaoService::class.java)
 
     @Volatile
@@ -59,7 +61,7 @@ open class ProposicaoService(
             for (baseDto in listaBase) {
                 if (!varreduraAtiva) break
                 try {
-                    processarE_SalvarProposicao(baseDto)
+                    self.processarE_SalvarProposicao(baseDto)
                 } catch (e: Exception) {
                     logger.error("❌ Erro ao salvar proposicao ${baseDto.publicId}: ${e.message}")
                 }
@@ -83,25 +85,28 @@ open class ProposicaoService(
 
         // Busca Detalhes Completos da API
         val detalhes = cldfIntegration.buscarDetalhesCompletos(publicIdStr) ?: return
+        val propCompleta = detalhes.proposicao
+        val listaHistorico = detalhes.historico
 
         // 1. Processar RAs (Usando a lista exata do DTO base com erro de digitação proposital da API e IDs do Completo)
         val rasSincronizadas = processarRasDinamicamente(
             nomesRas = baseDto.regiaoAdiminstrativaNomeLista,
-            idsRas = detalhes.regiaoAdministrativa
+            idsRas = propCompleta?.regiaoAdministrativa
         )
 
         // 2. Montar a Entidade Principal Proposição
         val proposicao = Proposicao(
             publicId = publicIdStr,
-            tipo = detalhes.tipoProposicao?.sigla?.let { converterSiglaEnum(it) } ?: TipoProjetoLei.PL,
+            tipo = propCompleta?.tipoProposicao?.sigla?.let { converterSiglaEnum(it) } ?: TipoProjetoLei.PL,
             numeroProcesso = baseDto.siglaNumeroAno ?: "S/N",
-            titulo = baseDto.siglaNumeroAno ?: detalhes.siglaNumero ?: "Sem título",
+            titulo = baseDto.siglaNumeroAno ?: propCompleta?.siglaNumero ?: "Sem título",
             ementa = baseDto.ementa,
-            statusTramitacao = detalhes.statusTramitacao ?: baseDto.etapa,
-            regimeUrgencia = detalhes.regimeUrgencia ?: false,
-            excluido = detalhes.excluido ?: false,
-            dataApresentacao = baseDto.dataCadastro ?: parseLocalDateSeguro(detalhes.dataCadastro) ?: LocalDate.now(),
-            idUnidadeGeradora = detalhes.idUnidadeGeradora,
+            numeroDefinitivo = propCompleta?.numeroDefinitivo,
+            statusTramitacao = propCompleta?.statusTramitacao ?: baseDto.etapa,
+            regimeUrgencia = propCompleta?.regimeUrgencia ?: false,
+            excluido = propCompleta?.excluido ?: false,
+            dataApresentacao = baseDto.dataCadastro ?: parseLocalDateSeguro(propCompleta?.dataCadastro) ?: LocalDate.now(),
+            idUnidadeGeradora = propCompleta?.idUnidadeGeradora,
             linkCompleto = "https://ple.cl.df.gov.br/#/proposicao/$publicIdStr/consultar",
             regioesAdministrativas = rasSincronizadas.toMutableSet()
         )
@@ -109,7 +114,7 @@ open class ProposicaoService(
         val proposicaoSalva = proposicaoRepo.save(proposicao)
 
         // 3. Vincular Temas (A API retorna IDs como List<Int> em temasIds)
-        val temasIdsNumericos = detalhes.temasIds
+        val temasIdsNumericos = propCompleta?.temasIds
         if (!temasIdsNumericos.isNullOrEmpty()) {
             val temasProcessados = cldfIntegration.processarTemasProposicao(temasIdsNumericos)
             proposicaoSalva.temas.addAll(temasProcessados)
@@ -117,30 +122,46 @@ open class ProposicaoService(
         }
 
         // 4. Vincular Autores
-        detalhes.autores?.forEach { autorDto ->
-            autorDto.nome?.let { nomeCru ->
-                // Limpa títulos honoríficos para bater com o banco
-                val nomeLimpo = nomeCru.replace("Deputado", "", ignoreCase = true)
-                    .replace("Deputada", "", ignoreCase = true).trim()
+        val listaAutoresDto = propCompleta?.autores
 
+        if (!listaAutoresDto.isNullOrEmpty()) {
 
-                // Se o seu repo retornar List em vez de Optional, mude para: val politico = politicoOpt.firstOrNull()
-                val politicosEncontrados = politicoRepo.findByNomeCompletoContainingIgnoreCase(nomeLimpo)
-                val politicox = politicosEncontrados.firstOrNull()
-                if (politicox !=null) {
-                    val autoria = Autoria(
-                        politico = politicox,
+            // 2. Iteramos sobre cada autor retornado no JSON
+            listaAutoresDto.forEach { autorDto ->
+                val nomeCru = autorDto.nome
+
+                // Se por algum motivo bizarro a API mandar um nome nulo, a gente pula para o próximo
+                if (nomeCru.isNullOrBlank()) return@forEach
+
+                // 3. Limpamos o título (Deputado, Dra, Pastor, etc)
+                val nomeLimpo = nomeCru.replace(
+                    Regex("^(Deputado|Deputada|Pastor|Pastora|Doutor|Doutora|Dr\\.|Dra\\.)\\s+", RegexOption.IGNORE_CASE),
+                    ""
+                ).trim()
+
+                // 4. Procuramos o político no banco pelo nome limpo
+                val politico = politicoRepo.findByNomeUrnaContainingIgnoreCase(nomeLimpo).firstOrNull()
+
+                if (politico != null) {
+                    // 5. Criamos o vínculo na tabela de Autoria
+                    val novaAutoria = Autoria(
                         proposicao = proposicaoSalva,
+                        politico = politico,
+                        // Usamos o tipo de autor que vem da API (Ex: "PARLAMENTAR") ou "AUTOR" como garantia
+                        tipoVinculacao = autorDto.tipoAutor ?: "AUTOR"
                     )
-                    autoriaRepo.save(autoria)
+                    autoriaRepo.save(novaAutoria)
+                    logger.info("✅ Autoria vinculada com sucesso: ${politico} (${novaAutoria.tipoVinculacao})")
                 } else {
-                    logger.warn("⚠️ Deputado não encontrado no banco: '$nomeCru'")
+                    logger.warn("⚠️ Político não encontrado no banco para vincular autoria: '$nomeLimpo' (Original: '$nomeCru')")
                 }
             }
+        } else {
+            logger.info("ℹ️ Proposição ${proposicaoSalva.publicId} sem lista de autores no detalhamento.")
         }
 
         // 5. Salvar Histórico (Embutido no DetalhesDTO, lendo com os nomes EXATOS do HistoricoCldfDTO)
-        detalhes.historico?.forEach { histDto ->
+        listaHistorico.forEach { histDto ->
             if (histDto.dataHistorico != null && histDto.acao != null) {
 
                 val historico = ProposicaoHistorico(
@@ -159,18 +180,21 @@ open class ProposicaoService(
         val documentosDto = cldfIntegration.buscarDocumentos(publicIdStr)
         documentosDto.forEach { docDto ->
             val docPublicId = docDto.idArquivo
+            val autorLimpoDoDocumento = docDto.autoria?.replace(
+                Regex("^(Deputado|Deputada|Pastor|Pastora|Doutor|Doutora|Dr\\.|Dra\\.)\\s+", RegexOption.IGNORE_CASE), ""
+            )?.trim()
             if (docPublicId != null) {
                 val doc = DocumentosArquivos(
                     publicId = docPublicId,
                     tipoDocumento = docDto.nome ?: "DOCUMENTO",
                     nomeExibicao = docDto.nome ?: "Documento da Proposição",
                     nomeStorage = null,
-                    linkDireto = "https://ple.cl.df.gov.br/#/proposicao/$publicIdStr/consultar",
+                    linkDireto = "/api/proposicoes/$publicIdStr/documentos/$docPublicId/pdf",
                     tipoRelacionado = "PROPOSICAO",
                     idRelacionado = proposicaoSalva.id!!, // Garante que é Long
                     validoDesde = docDto.validoDesde ?: LocalDateTime.now(),
                     dataCadastro = docDto.dataDocumento,
-                    autor = docDto.autoria
+                    autor = autorLimpoDoDocumento
                 )
                 documentoRepo.save(doc)
             }
@@ -178,43 +202,59 @@ open class ProposicaoService(
 
         logger.info("✅ Proposição $publicIdStr salva com sucesso (Temas, RAs, Autores, Histórico e Documentos)!")
     }
-
+    fun baixarPdfDocumento(idProposicao: String, idDocumento: String): ByteArray? {
+        // Repassa a chamada para a sua integração que já faz o POST na CLDF
+        return cldfIntegration.baixarDocumentos(idProposicao, idDocumento)
+    }
+    fun buscarHtmlDocumento(idProposicao: String, idDocumento: String): String? {
+        return cldfIntegration.buscarHtmlDocumento(idProposicao, idDocumento)
+    }
     // =========================================================================
     // LÓGICA DINÂMICA DE REGIÕES ADMINISTRATIVAS
     // =========================================================================
     private fun processarRasDinamicamente(nomesRas: List<String>, idsRas: List<Int>?): List<RegiaoAdministrativa> {
-        val listaFinal = mutableListOf<RegiaoAdministrativa>()
+        val listaFinal = mutableSetOf<RegiaoAdministrativa>()
 
-        val tamanho = maxOf(nomesRas.size, idsRas?.size ?: 0)
+        // 1. Extrai, limpa as hashtags e remove referências genéricas ao DF
+        val nomesLimpos = nomesRas.flatMap { it.split("#") }
+            .map { it.trim() }
+            .filter { it.isNotBlank() && !it.contains("DISTRITO FEDERAL (INTEIRO)") }
+
+        val tamanho = maxOf(nomesLimpos.size, idsRas?.size ?: 0)
 
         for (i in 0 until tamanho) {
-            val nome = nomesRas.getOrNull(i)?.trim() ?: continue
+            val nomeDaRa = nomesLimpos.getOrNull(i)
             val idDaApi = idsRas?.getOrNull(i)?.toString()
 
-            val raExistente = raRepo.findByNomeContainingIgnoreCase(nome)
+            if (nomeDaRa == null && idDaApi == null) continue
+
+            var raExistente: RegiaoAdministrativa? = null
+
+            if (idDaApi != null) raExistente = raRepo.findByPublicId(idDaApi)
+            if (raExistente == null && nomeDaRa != null) raExistente = raRepo.findByNomeContainingIgnoreCase(nomeDaRa)
 
             if (raExistente != null) {
                 if (raExistente.publicId == null && idDaApi != null) {
                     raExistente.publicId = idDaApi
-                    raRepo.save(raExistente)
-                    logger.info("🔄 RA '$nome' enriquecida com o publicId: $idDaApi")
+                    raExistente = raRepo.save(raExistente)
                 }
                 listaFinal.add(raExistente)
-            } else {
+            } else if (nomeDaRa != null) {
                 val novaRa = RegiaoAdministrativa(
                     publicId = idDaApi,
-                    nome = nome
+                    nome = nomeDaRa
                 )
                 listaFinal.add(raRepo.save(novaRa))
-                logger.info("🆕 Nova RA cadastrada dinamicamente: $nome (ID: $idDaApi)")
+                logger.info("🆕 Nova RA cadastrada dinamicamente: ${novaRa.nome} (ID: $idDaApi)")
             }
         }
-        return listaFinal
+
+        return listaFinal.toList()
     }
     // =========================================================================
     // 1. LISTAGEM GERAL
     // =========================================================================
-
+    @Transactional(readOnly = true)
     fun listarTodas(): List<ProposicaoResumoDTO> {
         val proposicoes = proposicaoRepo.findAll()
 
@@ -233,7 +273,9 @@ open class ProposicaoService(
                 status = p.statusTramitacao ?: "TRAMITANDO",
                 data = p.dataApresentacao, // LocalDate direto da entidade
                 tema = p.temas.map { TemaDTO(id = it.id, nome = it.nome) }, // 'temas' da entidade
-                linkCompleto = p.linkCompleto
+                linkCompleto = p.linkCompleto,
+                autores = p.autores.map { it.politico.nomeUrna }, // Pega só o nome de cada autor
+                regioesAdministrativas = p.regioesAdministrativas.map { it.nome } // Pega só o nome da RA
             )
         }
     }
@@ -241,7 +283,7 @@ open class ProposicaoService(
     // =========================================================================
     // 2. BUSCAR DETALHES
     // =========================================================================
-
+    @Transactional(readOnly = true)
     fun buscarDetalhe(id: Long): ProposicaoDetalheDTO {
         val p = proposicaoRepo.findById(id)
             .orElseThrow { NoSuchElementException("Proposição com ID $id não encontrada.") }

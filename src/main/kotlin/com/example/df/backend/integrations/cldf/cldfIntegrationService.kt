@@ -96,19 +96,19 @@ open class CldfIntegrationService(
     }
 
 
-    override fun buscarDetalhesCompletos(publicId: String): ProposicaoCldfCompletaDTO? {
+    override fun buscarDetalhesCompletos(publicId: String): CldfDetalheResponse? { // Alterado o retorno para a Capa
         return try {
             webClient.get()
-                .uri("/proposicao/$publicId")
+                .uri("/proposicao/$publicId/detalhe")
                 .retrieve()
-                .bodyToMono<CldfDetalheResponse>() // Lê o envelope que definimos no DTO
-                .map { it.proposicao } // Extrai a proposição completa (já com o histórico lá dentro!)
-                .block()
+                .bodyToMono<CldfDetalheResponse>() // Agora retorna o objeto pai (proposicao + historico)
+                .block() // Removido o .map que descartava o histórico
         } catch (e: Exception) {
             logger.error("Erro ao buscar detalhes da proposicao $publicId: ${e.message}")
             null
         }
     }
+
 
     override fun buscarDocumentos(publicId: String): List<DocumentoCldfDTO> {
         return try {

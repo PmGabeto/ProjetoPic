@@ -10,10 +10,15 @@ data class PreferenciasNotificacao(
     @Column(name = "ID_USUARIO")
     var id: Long? = null,
 
+    @Column(name="NOTIF_EMAIL", nullable = true)
     val notifEmail: Boolean = true,
+    @Column(name="NOTIF_PUSH", nullable = true)
     val notifPush: Boolean = true,
+    @Column(name="NOTIF_OBRAS", nullable = true)
     val notifObras: Boolean = true,
+    @Column(name="NOTIF_PROPOSTAS", nullable = true)
     val notifPropostas: Boolean = true,
+    @Column(name="NOTIF_POLITICOS", nullable = true)
     val notifPoliticos: Boolean = false
 
     // O campo 'usuario' SAIU daqui

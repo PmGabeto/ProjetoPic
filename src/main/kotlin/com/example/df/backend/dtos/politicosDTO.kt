@@ -132,6 +132,10 @@ data class ProposicaoResumoDTO(
     @field:Schema(description = "Data de apresentação da proposição", example = "2024-02-27")
     val data: LocalDate,
 
+    val autores: List<String?> = emptyList(),
+
+    val regioesAdministrativas: List<String> = emptyList(),
+
     val linkCompleto: String?
 )
 data class ProposicaoDetalheDTO(

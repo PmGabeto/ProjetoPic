@@ -7,7 +7,7 @@ interface CldfInterface {
     fun processarTemasProposicao(temasIds: List<Int>): List<Tema>    fun garantirTemaIndividual(id: Long, nome: String): Tema
 
     fun varrerProposicoesRecentes(filtros: Map<String, Any>, pagina: Int, tamanho: Int): List<ProposicaoCldfBaseDTO>
-    fun buscarDetalhesCompletos(publicId: String): ProposicaoCldfCompletaDTO?
+    fun buscarDetalhesCompletos(publicId: String): CldfDetalheResponse?
     fun buscarDocumentos(publicId: String): List<DocumentoCldfDTO>
     fun baixarDocumentos(idProposicao: String, idDocumento: String): ByteArray?
     fun buscarHtmlDocumento(idProposicao: String, idDocumento: String): String?

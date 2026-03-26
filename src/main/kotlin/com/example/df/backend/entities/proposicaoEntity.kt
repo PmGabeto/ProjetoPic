@@ -28,8 +28,8 @@ data class Proposicao(
     @Column(name = "TITULO", length = 1000, nullable = false)
     var titulo: String,
 
-    @Lob
-    @Column(name = "EMENTA")
+
+    @Column(name = "EMENTA",columnDefinition = "TEXT")
     var ementa: String? = null,
 
     @Column(name = "STATUS_TRAMITACAO")

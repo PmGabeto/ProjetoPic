@@ -21,7 +21,7 @@ data class DocumentosArquivos(
     @Column(name = "NOME_EXIBICAO", nullable = false)
     val nomeExibicao: String, // Nome que o usuário vê
 
-    @Column(name = "NOME_STORAGE", nullable = false, unique = true)
+    @Column(name = "NOME_STORAGE", nullable = true, unique = true)
     val nomeStorage: String?=null, // Nome único do arquivo no seu servidor (ex: UUID.pdf)
 
     @Column(name = "LINK_DIRETO", length = 2000)
