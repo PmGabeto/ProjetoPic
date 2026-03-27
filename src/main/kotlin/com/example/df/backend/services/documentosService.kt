@@ -138,7 +138,8 @@ class DocumentoService(
                 extensao = doc.nomeStorage?.substringAfterLast(".", "pdf") ?: "pdf",
                 dataCadastro = doc.dataCadastro,
                 autor = doc.autor,
-                validoDesde = doc.validoDesde
+                validoDesde = doc.validoDesde,
+                siglaUnidadeCriacao = doc.siglaUnidadeCriacao
             )
         }
     }

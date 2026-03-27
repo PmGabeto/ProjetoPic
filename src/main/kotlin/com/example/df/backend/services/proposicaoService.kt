@@ -13,6 +13,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import org.springframework.scheduling.annotation.Scheduled
 
 @Service
 @Suppress("unused")
@@ -61,7 +62,7 @@ open class ProposicaoService(
             for (baseDto in listaBase) {
                 if (!varreduraAtiva) break
                 try {
-                    self.processarE_SalvarProposicao(baseDto)
+                    self.processareSalvarproposicao(baseDto)
                 } catch (e: Exception) {
                     logger.error("❌ Erro ao salvar proposicao ${baseDto.publicId}: ${e.message}")
                 }
@@ -73,28 +74,181 @@ open class ProposicaoService(
         logger.info("✅ Processo de varredura finalizado!")
     }
 
-    @Transactional
-    open fun processarE_SalvarProposicao(baseDto: ProposicaoCldfBaseDTO) {
-        // Usa o exato nome mapeado no seu DTO Base
-        val publicIdStr = baseDto.publicId ?: return
 
-        if (proposicaoRepo.existsByPublicId(publicIdStr)) {
-            logger.info("⏭️ Proposição $publicIdStr já existe no banco. Pulando...")
+    // =========================================================================
+    // AGENDAMENTO AUTOMÁTICO (Robô da Madrugada)
+    // =========================================================================
+
+    @Scheduled(cron = "0 0 2 * * *", zone = "America/Sao_Paulo")
+    fun sincronizacaoNoturnaAutomatica() {
+        if (varreduraAtiva) {
+            logger.warn("⚠️ A varredura já está em andamento. Ignorando o agendamento desta noite.")
             return
         }
 
-        // Busca Detalhes Completos da API
+        logger.info("🌙 Iniciando varredura agendada da madrugada (Anos: 2022 a 2026)...")
+        varreduraAtiva = true
+
+        val anosAlvo = listOf(2022, 2023, 2024, 2025, 2026)
+        val tamanho = 50
+
+        try {
+            for (ano in anosAlvo) {
+                if (!varreduraAtiva) {
+                    logger.info("🛑 Varredura noturna interrompida manualmente.")
+                    break
+                }
+
+                logger.info("📅 Buscando carga de proposições do ano: $ano")
+
+                var pagina = 0
+                // Cria o filtro dinâmico exatamente como a API espera
+                val filtros = mapOf("ano" to ano)
+
+                // Faz a paginação para aquele ano
+                while (varreduraAtiva) {
+                    // Chama a função real que existe na sua integração!
+                    val listaBase = cldfIntegration.varrerProposicoesRecentes(filtros, pagina, tamanho)
+
+                    if (listaBase.isEmpty()) {
+                        logger.info("🏁 Nenhuma proposição encontrada na página $pagina para o ano $ano. Indo para o próximo ano.")
+                        break // Sai do 'while' (acabaram as páginas deste ano) e vai para o próximo 'for' (próximo ano)
+                    }
+
+                    for (dto in listaBase) {
+                        if (!varreduraAtiva) break
+
+                        try {
+                            self.processareSalvarproposicao(dto)
+                        } catch (e: Exception) {
+                            logger.error("❌ Erro ao processar a proposição ${dto.publicId}: ${e.message}")
+                        }
+                    }
+
+                    pagina++
+
+                    // Respiro de 2 segundos para não tomar bloqueio de IP da CLDF
+                    Thread.sleep(2000)
+                }
+            }
+        } catch (e: Exception) {
+            logger.error("🚨 Erro fatal durante a varredura agendada: ${e.message}", e)
+        } finally {
+            varreduraAtiva = false
+            logger.info("☀️ Varredura noturna finalizada com sucesso! O robô vai voltar a dormir.")
+        }
+    }
+    // =========================================================================
+    // O "MAESTRO" - Decide se vai Atualizar ou Inserir
+    // =========================================================================
+    @Transactional
+    open fun processareSalvarproposicao(baseDto: ProposicaoCldfBaseDTO) {
+        val publicIdStr = baseDto.publicId ?: return
+
+        // 1. Em vez de usar existsByPublicId, já trazemos a entidade para poder atualizar
+        val proposicaoExistente = proposicaoRepo.findByPublicId(publicIdStr)
+
+        if (proposicaoExistente != null) {
+            // Se já existe, joga para a função especialista em UPDATE
+            atualizarProposicaoExistente(proposicaoExistente, baseDto, publicIdStr)
+        } else {
+            // Se não existe, joga para a função especialista em INSERT
+            inserirNovaProposicao(baseDto, publicIdStr)
+        }
+    }
+
+    // =========================================================================
+    // LÓGICA DE UPDATE (Sincronização de Diferenças)
+    // =========================================================================
+    private fun atualizarProposicaoExistente(proposicaoExistente: Proposicao, baseDto: ProposicaoCldfBaseDTO, publicIdStr: String) {
+        logger.info("🔄 Proposição $publicIdStr já existe. A verificar atualizações...")
+        var teveAtualizacao = false
+
         val detalhes = cldfIntegration.buscarDetalhesCompletos(publicIdStr) ?: return
         val propCompleta = detalhes.proposicao
         val listaHistorico = detalhes.historico
 
-        // 1. Processar RAs (Usando a lista exata do DTO base com erro de digitação proposital da API e IDs do Completo)
+        // 1. VERIFICA MUDANÇA DE STATUS / URGÊNCIA
+        val novoStatus = propCompleta?.statusTramitacao ?: baseDto.etapa
+        if (proposicaoExistente.statusTramitacao != novoStatus) {
+            logger.info("📉 Status da proposição $publicIdStr mudou para '$novoStatus'")
+            proposicaoExistente.statusTramitacao = novoStatus
+            teveAtualizacao = true
+        }
+
+        if (propCompleta?.regimeUrgencia != null && proposicaoExistente.regimeUrgencia != propCompleta.regimeUrgencia) {
+            proposicaoExistente.regimeUrgencia = propCompleta.regimeUrgencia
+            teveAtualizacao = true
+        }
+
+        if (teveAtualizacao) proposicaoRepo.save(proposicaoExistente)
+
+        // 2. VERIFICA NOVOS HISTÓRICOS (Comparando pela DATA exata)
+        val historicosBanco = historicoRepo.findByProjetoIdOrderByDataEventoDesc(proposicaoExistente.id!!)
+        val datasHistoricoBanco = historicosBanco.map { it.dataEvento }.toSet()
+
+        listaHistorico.forEach { histDto ->
+            val dataDoHistoricoDaApi = histDto.dataHistorico
+
+            if (dataDoHistoricoDaApi != null && !datasHistoricoBanco.contains(dataDoHistoricoDaApi)) {
+                val historico = ProposicaoHistorico(
+                    publicId = histDto.publicId ?: UUID.randomUUID().toString(), // Gera UUID se vier nulo
+                    dataEvento = dataDoHistoricoDaApi,
+                    faseTramitacao = histDto.acao,
+                    unidadeResponsavel = histDto.nomeUnidade ?: histDto.sigla ?: "CLDF",
+                    descricao = histDto.descricao,
+                    projeto = proposicaoExistente
+                )
+                historicoRepo.save(historico)
+                logger.info("➕ Novo histórico adicionado na atualização: ${historico.faseTramitacao}")
+            }
+        }
+
+        // 3. VERIFICA NOVOS DOCUMENTOS
+        val documentosBanco = documentoRepo.findByTipoRelacionadoAndIdRelacionado("PROPOSICAO", proposicaoExistente.id)
+        val idsDocsBanco = documentosBanco.map { it.publicId }.toSet()
+        val documentosDto = cldfIntegration.buscarDocumentos(publicIdStr)
+
+        documentosDto.forEach { docDto ->
+            val docPublicId = docDto.idArquivo
+            if (docPublicId != null && !idsDocsBanco.contains(docPublicId)) {
+                val autorLimpoDoDocumento = docDto.autoria?.replace(
+                    Regex("^(Deputado|Deputada|Pastor|Pastora|Doutor|Doutora|Dr\\.|Dra\\.)\\s+", RegexOption.IGNORE_CASE), ""
+                )?.trim()
+
+                val doc = DocumentosArquivos(
+                    publicId = docPublicId,
+                    tipoDocumento = docDto.nome ?: "DOCUMENTO",
+                    nomeExibicao = docDto.nome ?: "Documento da Proposição",
+                    linkDireto = "/api/proposicoes/$publicIdStr/documentos/$docPublicId/pdf",
+                    tipoRelacionado = "PROPOSICAO",
+                    idRelacionado = proposicaoExistente.id,
+                    validoDesde = docDto.validoDesde ?: LocalDateTime.now(),
+                    dataCadastro = docDto.dataDocumento,
+                    autor = autorLimpoDoDocumento,
+                    siglaUnidadeCriacao = docDto.siglaUnidadeCriacao
+                )
+                documentoRepo.save(doc)
+                logger.info("📄 Novo documento salvo na atualização: ${doc.nomeExibicao}")
+            }
+        }
+    }
+
+    // =========================================================================
+    // LÓGICA DE INSERT (Criação do Zero)
+    // =========================================================================
+    private fun inserirNovaProposicao(baseDto: ProposicaoCldfBaseDTO, publicIdStr: String) {
+        logger.info("🆕 A criar nova proposição $publicIdStr...")
+
+        val detalhes = cldfIntegration.buscarDetalhesCompletos(publicIdStr) ?: return
+        val propCompleta = detalhes.proposicao
+        val listaHistorico = detalhes.historico
+
         val rasSincronizadas = processarRasDinamicamente(
             nomesRas = baseDto.regiaoAdiminstrativaNomeLista,
             idsRas = propCompleta?.regiaoAdministrativa
         )
 
-        // 2. Montar a Entidade Principal Proposição
         val proposicao = Proposicao(
             publicId = publicIdStr,
             tipo = propCompleta?.tipoProposicao?.sigla?.let { converterSiglaEnum(it) } ?: TipoProjetoLei.PL,
@@ -113,7 +267,6 @@ open class ProposicaoService(
 
         val proposicaoSalva = proposicaoRepo.save(proposicao)
 
-        // 3. Vincular Temas (A API retorna IDs como List<Int> em temasIds)
         val temasIdsNumericos = propCompleta?.temasIds
         if (!temasIdsNumericos.isNullOrEmpty()) {
             val temasProcessados = cldfIntegration.processarTemasProposicao(temasIdsNumericos)
@@ -121,49 +274,37 @@ open class ProposicaoService(
             proposicaoRepo.save(proposicaoSalva)
         }
 
-        // 4. Vincular Autores
         val listaAutoresDto = propCompleta?.autores
-
         if (!listaAutoresDto.isNullOrEmpty()) {
+            val politicosJaVinculados = mutableSetOf<Long>()
 
-            // 2. Iteramos sobre cada autor retornado no JSON
             listaAutoresDto.forEach { autorDto ->
                 val nomeCru = autorDto.nome
-
-                // Se por algum motivo bizarro a API mandar um nome nulo, a gente pula para o próximo
                 if (nomeCru.isNullOrBlank()) return@forEach
 
-                // 3. Limpamos o título (Deputado, Dra, Pastor, etc)
                 val nomeLimpo = nomeCru.replace(
-                    Regex("^(Deputado|Deputada|Pastor|Pastora|Doutor|Doutora|Dr\\.|Dra\\.)\\s+", RegexOption.IGNORE_CASE),
-                    ""
+                    Regex("^(Deputado|Deputada|Pastor|Pastora|Doutor|Doutora|Dr\\.|Dra\\.)\\s+", RegexOption.IGNORE_CASE), ""
                 ).trim()
 
-                // 4. Procuramos o político no banco pelo nome limpo
                 val politico = politicoRepo.findByNomeUrnaContainingIgnoreCase(nomeLimpo).firstOrNull()
 
-                if (politico != null) {
-                    // 5. Criamos o vínculo na tabela de Autoria
-                    val novaAutoria = Autoria(
-                        proposicao = proposicaoSalva,
-                        politico = politico,
-                        // Usamos o tipo de autor que vem da API (Ex: "PARLAMENTAR") ou "AUTOR" como garantia
-                        tipoVinculacao = autorDto.tipoAutor ?: "AUTOR"
-                    )
-                    autoriaRepo.save(novaAutoria)
-                    logger.info("✅ Autoria vinculada com sucesso: ${politico} (${novaAutoria.tipoVinculacao})")
-                } else {
-                    logger.warn("⚠️ Político não encontrado no banco para vincular autoria: '$nomeLimpo' (Original: '$nomeCru')")
+                if (politico != null && politico.id != null) {
+                    if (!politicosJaVinculados.contains(politico.id)) {
+                        val novaAutoria = Autoria(
+                            proposicao = proposicaoSalva,
+                            politico = politico,
+                            tipoVinculacao = autorDto.tipoAutor ?: "AUTOR"
+                        )
+                        autoriaRepo.save(novaAutoria)
+                        politicosJaVinculados.add(politico.id)
+                        logger.info("✅ Autoria vinculada com sucesso: ${politico.nomeUrna}")
+                    }
                 }
             }
-        } else {
-            logger.info("ℹ️ Proposição ${proposicaoSalva.publicId} sem lista de autores no detalhamento.")
         }
 
-        // 5. Salvar Histórico (Embutido no DetalhesDTO, lendo com os nomes EXATOS do HistoricoCldfDTO)
         listaHistorico.forEach { histDto ->
             if (histDto.dataHistorico != null && histDto.acao != null) {
-
                 val historico = ProposicaoHistorico(
                     publicId = histDto.publicId ?: UUID.randomUUID().toString(),
                     dataEvento = histDto.dataHistorico,
@@ -176,13 +317,13 @@ open class ProposicaoService(
             }
         }
 
-        // 6. Salvar Documentos (Usando o DocumentoCldfDTO com os nomes idArquivo e validoDesde)
         val documentosDto = cldfIntegration.buscarDocumentos(publicIdStr)
         documentosDto.forEach { docDto ->
             val docPublicId = docDto.idArquivo
             val autorLimpoDoDocumento = docDto.autoria?.replace(
                 Regex("^(Deputado|Deputada|Pastor|Pastora|Doutor|Doutora|Dr\\.|Dra\\.)\\s+", RegexOption.IGNORE_CASE), ""
             )?.trim()
+
             if (docPublicId != null) {
                 val doc = DocumentosArquivos(
                     publicId = docPublicId,
@@ -191,10 +332,11 @@ open class ProposicaoService(
                     nomeStorage = null,
                     linkDireto = "/api/proposicoes/$publicIdStr/documentos/$docPublicId/pdf",
                     tipoRelacionado = "PROPOSICAO",
-                    idRelacionado = proposicaoSalva.id!!, // Garante que é Long
+                    idRelacionado = proposicaoSalva.id!!,
                     validoDesde = docDto.validoDesde ?: LocalDateTime.now(),
                     dataCadastro = docDto.dataDocumento,
-                    autor = autorLimpoDoDocumento
+                    autor = autorLimpoDoDocumento,
+                    siglaUnidadeCriacao = docDto.siglaUnidadeCriacao
                 )
                 documentoRepo.save(doc)
             }
@@ -327,7 +469,8 @@ open class ProposicaoService(
                     extensao = d.nomeStorage?.substringAfterLast(".", "pdf") ?: "pdf",
                     dataCadastro = d.dataCadastro ?: LocalDateTime.now(),
                     validoDesde = d.validoDesde ?: LocalDateTime.now(),
-                    autor = d.autor
+                    autor = d.autor,
+                    siglaUnidadeCriacao = d.siglaUnidadeCriacao
                 )
             },
 
@@ -368,7 +511,7 @@ open class ProposicaoService(
 
         // Cria a entidade com os nomes EXATOS da sua classe ProposicaoHistorico
         val novoHistorico = ProposicaoHistorico(
-            publicId = java.util.UUID.randomUUID().toString(), // Obrigatorio pelo unique=true
+            publicId = UUID.randomUUID().toString(), // Obrigatorio pelo unique=true
             dataEvento = dto.dataEvento.atStartOfDay(), // Converte LocalDate do DTO para LocalDateTime da Entidade
             faseTramitacao = dto.faseTramitacao,
             unidadeResponsavel = dto.unidadeResponsavel,

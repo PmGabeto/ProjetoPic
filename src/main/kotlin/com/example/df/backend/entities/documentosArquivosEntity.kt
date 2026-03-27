@@ -44,5 +44,9 @@ data class DocumentosArquivos(
     val autor: String? = null,
 
     @Column(name = "VALIDO_DESDE")
-    val validoDesde: LocalDateTime
+    val validoDesde: LocalDateTime,
+
+    @Column(name = "sigla_Unidade_Criacao")
+    val siglaUnidadeCriacao: String? = null
+
 )

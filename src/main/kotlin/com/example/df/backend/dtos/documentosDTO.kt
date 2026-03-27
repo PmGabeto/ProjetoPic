@@ -15,7 +15,8 @@ data class DocumentoResponseDTO(
     val extensao: String?,     // pdf, docx, etc.
     val dataCadastro: LocalDateTime,
     val autor: String?,
-    val validoDesde :LocalDateTime
+    val validoDesde :LocalDateTime,
+    val siglaUnidadeCriacao :String?
 )
 
 // ==========================================

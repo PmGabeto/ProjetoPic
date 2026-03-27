@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 
 /**
  * DTOs de Carga: Espelhos fiéis da API da CLDF.
@@ -45,7 +44,7 @@ data class HistoricoCldfDTO( // precisa no dto ter o id da proposição para vin
     @field:JsonProperty("id") val publicId: String? = null,
     @field:JsonProperty("idProposicao") val idProposicaoVinculada: String? = null,
     @field:JsonProperty("dataHistorico") val dataHistorico: LocalDateTime? = null ,
-    @field:JsonProperty("acao") val acao: String? = null,
+    @field:JsonProperty("acao") val acao: String?,
     @field:JsonProperty("nomeUnidade") val nomeUnidade: String? = null,
     @field:JsonProperty("sigla") val sigla: String? = null,
     @field:JsonProperty("descricao") val descricao: String? = null
@@ -115,7 +114,7 @@ data class DocumentoCldfDTO(
     @field:JsonProperty("dataDocumento") val dataDocumento: LocalDateTime, // Data precisa com hora -"dataDocumento": "2021-03-12T11:23:58",
 
     @field:JsonProperty("autoria") val autoria: String? = null, // Quem gerou o doc - pode ser visto como ula lista de nomes?
-    @field:JsonProperty("siglaUnidadeCriacao") val unidadeCriacao: String? = null,// Gabinete
+    @field:JsonProperty("siglaUnidadeCriacao") val siglaUnidadeCriacao: String? = null,// Gabinete
     @field:JsonProperty("validoDesde") val validoDesde: LocalDateTime? = null
 ){
     val autoriaLista: List<String>

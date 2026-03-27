@@ -46,14 +46,16 @@ data class DocumentoDTO(
     @field:Schema(description = "Link do PDF", example = "https://cldf.gov.br/doc.pdf")
     val link: String?,
     @field:Schema(description = "Autor do documento", example = "Comissão de Justiça")
-    val autor: String?
+    val autor: String?,
+    @field:Schema(description = " sigla de onde foi criado", example = "SELEG")
+    val siglaUnidadeCriacao: String? = null,
 )
 
 data class HistoricoDTO(
     @field:Schema(description = "Data do evento", example = "2024-02-15")
     val data: LocalDateTime,
     @field:Schema(description = "Fase atual da tramitação", example = "Aguardando Votação")
-    val fase: String,
+    val fase: String?,
     @field:Schema(description = "Unidade que está avaliando", example = "Plenário")
     val unidadeResponsavel: String?,
     @field:Schema(description = "Descrição da movimentação", example = "Encaminhado para votação.")

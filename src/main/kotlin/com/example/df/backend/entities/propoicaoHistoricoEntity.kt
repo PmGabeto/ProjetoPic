@@ -18,8 +18,8 @@ val publicId: String,
     @Column(name = "DT_EVENTO", nullable = false)
     val dataEvento: LocalDateTime,
 
-    @Column(name = "FASE_TRAMITACAO", nullable = false)
-    val faseTramitacao: String,
+    @Column(name = "FASE_TRAMITACAO", nullable = true)
+    val faseTramitacao: String?,
 
     @Column(name = "UNIDADE_RESPONSAVEL")
     val unidadeResponsavel: String? = null, // Ex: "Comissão de Constituição e Justiça"

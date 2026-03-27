@@ -78,7 +78,8 @@ class DocumentoController(
             extensao = docSalvo.nomeStorage?.substringAfterLast(".", "pdf") ?: "pdf",
             dataCadastro = docSalvo.dataCadastro,
             validoDesde = docSalvo.validoDesde,
-            autor = docSalvo.autor
+            autor = docSalvo.autor,
+            siglaUnidadeCriacao = docSalvo.siglaUnidadeCriacao
         )
 
         return ResponseEntity.ok(responseDTO)
@@ -115,7 +116,9 @@ class DocumentoController(
             autor = docSalvo.autor,
             validoDesde = docSalvo.validoDesde,
             publicId = docSalvo.publicId,
-            tipoRelacionado = docSalvo.tipoRelacionado
+            tipoRelacionado = docSalvo.tipoRelacionado,
+            siglaUnidadeCriacao = docSalvo.siglaUnidadeCriacao
+
         )
 
         return ResponseEntity.status(HttpStatus.CREATED).body(responseDTO)
