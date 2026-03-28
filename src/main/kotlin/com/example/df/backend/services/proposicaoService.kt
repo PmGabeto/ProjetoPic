@@ -355,15 +355,15 @@ open class ProposicaoService(
                     // Alerta amarelo no log na mesma hora
                     logger.warn("\u001B[43m\u001B[30m ⚠️ AUTO-CADASTRO: Novo político criado no sistema ($nomeLimpo). \u001B[0m")
                 }
-                if (politico.id != null) {
-                    if (!politicosJaVinculados.contains(politico.id)) {
-                        val novaAutoria = Autoria(
+                 val politicoID = politico.id
+                if (politicoID != null) {
+                    if (!politicosJaVinculados.contains(politicoID)) {                        val novaAutoria = Autoria(
                             proposicao = proposicaoSalva,
                             politico = politico,
                             tipoVinculacao = autorDto.tipoAutor ?: "AUTOR"
                         )
                         autoriaRepo.save(novaAutoria)
-                        politicosJaVinculados.add(politico.id)
+                        politicosJaVinculados.add(politicoID)
                         logger.info("✅ Autoria vinculada com sucesso: ${politico.nomeUrna}")
                     }
                 }
@@ -441,7 +441,6 @@ open class ProposicaoService(
                 continue
             }
 
-            // Tenta achar a RA que você pré-cadastrou via SQL
             var ra = raRepo.findByNomeContainingIgnoreCase(nomeCru)
 
             if (ra == null) {
