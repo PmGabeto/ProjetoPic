@@ -27,7 +27,9 @@ data class CldfDetalheResponse(
 data class AutorCldfDTO(
     @field:JsonProperty("id") val id: Int? =null,
     @field:JsonProperty("nome") val nome: String? =null,
-    @field:JsonProperty("tipoAutor") val tipoAutor: String ? =null
+    @field:JsonProperty("tipoAutor") val tipoAutor: String ? =null,
+    @field:JsonProperty(value = "situacao")
+    val situacao: String? = null
 )
 
 // 6. TIPO DE PROPOSIÇÃO (Objeto interno da Proposição)

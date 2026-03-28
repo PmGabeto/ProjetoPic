@@ -2,6 +2,8 @@ package com.example.df.backend.services
 
 import com.example.df.backend.dtos.*
 import com.example.df.backend.entities.*
+import com.example.df.backend.enums.StatusPolitico
+import com.example.df.backend.enums.TipoAutor
 import com.example.df.backend.enums.TipoProjetoLei
 import com.example.df.backend.integrations.cldf.CldfInterface
 import com.example.df.backend.integrations.cldf.ProposicaoCldfBaseDTO
@@ -34,6 +36,7 @@ open class ProposicaoService(
 
     @Volatile
     var varreduraAtiva: Boolean = false
+    private val politicosPendentesDeCadastro = mutableSetOf<String>()
 
     fun pararVarredura() {
         varreduraAtiva = false
@@ -136,6 +139,23 @@ open class ProposicaoService(
         } finally {
             varreduraAtiva = false
             logger.info("☀️ Varredura noturna finalizada com sucesso! O robô vai voltar a dormir.")
+            if (politicosPendentesDeCadastro.isNotEmpty()) {
+                // \u001B[41m = Fundo Vermelho | \u001B[37m = Texto Branco | \u001B[1m = Negrito | \u001B[0m = Reseta Cor
+                logger.warn("\n\u001B[41m\u001B[37m\u001B[1m ============================================================================== \u001B[0m")
+                logger.warn("\u001B[41m\u001B[37m\u001B[1m 🚨 ALERTA DE SISTEMA: ${politicosPendentesDeCadastro.size} NOVAS ENTIDADES POLÍTICAS FORAM CADASTRADAS! 🚨 \u001B[0m")
+                logger.warn("\u001B[41m\u001B[37m\u001B[1m ============================================================================== \u001B[0m")
+                logger.warn("\u001B[41m\u001B[37m\u001B[1m O robô criou perfis básicos baseados nos dados da CLDF.                        \u001B[0m")
+                logger.warn("\u001B[41m\u001B[37m\u001B[1m Favor acessar o painel de administração e completar o cadastro de:             \u001B[0m")
+
+                politicosPendentesDeCadastro.forEach { nomeAlerta ->
+                    logger.warn("\u001B[41m\u001B[37m\u001B[1m -> $nomeAlerta \u001B[0m")
+                }
+
+                logger.warn("\u001B[41m\u001B[37m\u001B[1m ============================================================================== \u001B[0m\n")
+
+                // Limpa a lista para a próxima madrugada não repetir os nomes velhos
+                politicosPendentesDeCadastro.clear()
+            }
         }
     }
     // =========================================================================
@@ -232,6 +252,22 @@ open class ProposicaoService(
                 logger.info("📄 Novo documento salvo na atualização: ${doc.nomeExibicao}")
             }
         }
+       // 4. VERIFICA NOVAS REGIÕES ADMINISTRATIVAS
+        val rasSincronizadas = processarRasDinamicamente(
+            nomesRas = baseDto.regiaoAdiminstrativaNomeLista ?: emptyList(),
+            idsRas = propCompleta?.regiaoAdministrativa ?: emptyList()
+        )
+
+        if (rasSincronizadas.isNotEmpty()) {
+            val tamanhoAtual = proposicaoExistente.regioesAdministrativas.size
+            proposicaoExistente.regioesAdministrativas.addAll(rasSincronizadas)
+
+            // Se o tamanho do conjunto de RAs aumentou, é porque entrou RA nova, então salva!
+            if (proposicaoExistente.regioesAdministrativas.size > tamanhoAtual) {
+                proposicaoRepo.save(proposicaoExistente)
+                logger.info("📍 Novas RAs vinculadas à proposição ${proposicaoExistente.publicId} na atualização: ${rasSincronizadas.map { it.nome }}")
+            }
+        }
     }
 
     // =========================================================================
@@ -286,9 +322,40 @@ open class ProposicaoService(
                     Regex("^(Deputado|Deputada|Pastor|Pastora|Doutor|Doutora|Dr\\.|Dra\\.)\\s+", RegexOption.IGNORE_CASE), ""
                 ).trim()
 
-                val politico = politicoRepo.findByNomeUrnaContainingIgnoreCase(nomeLimpo).firstOrNull()
+                var politico = politicoRepo.findByNomeUrnaContainingIgnoreCase(nomeLimpo).firstOrNull()
+                if (politico == null) {
+                    // 1. Converte as ‘Strings’ do JSON para os Enums de forma segura
+                    val statusSafe = runCatching {
+                        StatusPolitico.valueOf(autorDto.situacao?.uppercase() ?: "ATIVO")
+                    }.getOrDefault(StatusPolitico.ATIVO)
 
-                if (politico != null && politico.id != null) {
+                    val tipoAutorSafe = runCatching {
+                        TipoAutor.valueOf(autorDto.tipoAutor?.uppercase() ?: "PARLAMENTAR")
+                    }.getOrDefault(TipoAutor.PARLAMENTAR)
+
+                    // 2. Monta a entidade com os dados disponíveis
+                    val novoPolitico = Politico(
+                        // Transforma o ID numérico do JSON no publicId (String).
+                        // Se por acaso vier nulo da API, gera um temporário para não violar o nullable=false do banco.
+                        publicId = autorDto.id?.toString() ?: "TEMP_${java.util.UUID.randomUUID()}",
+                        nomeCompleto = nomeCru, // Ex: "Deputado Chico Vigilante"
+                        nomeUrna = nomeLimpo,   // Ex: "Chico Vigilante"
+                        status = statusSafe,
+                        tipoAutor = tipoAutorSafe
+
+
+                    )
+
+                    // Salva no banco imediatamente e atribui à variável 'politico'
+                    politico = politicoRepo.save(novoPolitico)
+
+                    // Adiciona na memória do robô para soltar o alerta vermelho no final da madrugada
+                    politicosPendentesDeCadastro.add(nomeLimpo)
+
+                    // Alerta amarelo no log na mesma hora
+                    logger.warn("\u001B[43m\u001B[30m ⚠️ AUTO-CADASTRO: Novo político criado no sistema ($nomeLimpo). \u001B[0m")
+                }
+                if (politico.id != null) {
                     if (!politicosJaVinculados.contains(politico.id)) {
                         val novaAutoria = Autoria(
                             proposicao = proposicaoSalva,
@@ -354,45 +421,51 @@ open class ProposicaoService(
     // =========================================================================
     // LÓGICA DINÂMICA DE REGIÕES ADMINISTRATIVAS
     // =========================================================================
-    private fun processarRasDinamicamente(nomesRas: List<String>, idsRas: List<Int>?): List<RegiaoAdministrativa> {
-        val listaFinal = mutableSetOf<RegiaoAdministrativa>()
+    private fun processarRasDinamicamente(nomesRas: List<String>?, idsRas: List<Int>?): MutableSet<RegiaoAdministrativa> {
+        val rasSincronizadas = mutableSetOf<RegiaoAdministrativa>()
 
-        // 1. Extrai, limpa as hashtags e remove referências genéricas ao DF
-        val nomesLimpos = nomesRas.flatMap { it.split("#") }
-            .map { it.trim() }
-            .filter { it.isNotBlank() && !it.contains("DISTRITO FEDERAL (INTEIRO)") }
+        val listaRaNomes = nomesRas ?: emptyList()
+        val listaRaIds = idsRas ?: emptyList()
 
-        val tamanho = maxOf(nomesLimpos.size, idsRas?.size ?: 0)
+        val tamanhoRas = maxOf(listaRaNomes.size, listaRaIds.size)
 
-        for (i in 0 until tamanho) {
-            val nomeDaRa = nomesLimpos.getOrNull(i)
-            val idDaApi = idsRas?.getOrNull(i)?.toString()
+        for (i in 0 until tamanhoRas) {
+            val nomeCru = listaRaNomes.getOrNull(i)
+            val idCru = listaRaIds.getOrNull(i)?.toString() ?: "SEM_ID_$i"
 
-            if (nomeDaRa == null && idDaApi == null) continue
+            // Ignora se não houver nome
+            if (nomeCru.isNullOrBlank()) continue
 
-            var raExistente: RegiaoAdministrativa? = null
-
-            if (idDaApi != null) raExistente = raRepo.findByPublicId(idDaApi)
-            if (raExistente == null && nomeDaRa != null) raExistente = raRepo.findByNomeContainingIgnoreCase(nomeDaRa)
-
-            if (raExistente != null) {
-                if (raExistente.publicId == null && idDaApi != null) {
-                    raExistente.publicId = idDaApi
-                    raExistente = raRepo.save(raExistente)
-                }
-                listaFinal.add(raExistente)
-            } else if (nomeDaRa != null) {
-                val novaRa = RegiaoAdministrativa(
-                    publicId = idDaApi,
-                    nome = nomeDaRa
-                )
-                listaFinal.add(raRepo.save(novaRa))
-                logger.info("🆕 Nova RA cadastrada dinamicamente: ${novaRa.nome} (ID: $idDaApi)")
+            // Ignora o Distrito Federal genérico e IDs 0
+            if (nomeCru.contains("DISTRITO FEDERAL", ignoreCase = true) || idCru == "0") {
+                continue
             }
+
+            // Tenta achar a RA que você pré-cadastrou via SQL
+            var ra = raRepo.findByNomeContainingIgnoreCase(nomeCru)
+
+            if (ra == null) {
+                // Se a CLDF inventar uma RA nova que não estava na sua lista, ele cria.
+                val novaRa = RegiaoAdministrativa(
+                    nome = nomeCru,
+                    publicId = idCru
+                )
+                ra = raRepo.save(novaRa)
+                logger.info("📍 Nova RA cadastrada dinamicamente que não estava na lista: $nomeCru")
+            } else if (ra.publicId?.startsWith("TEMP_") == true || ra.publicId != idCru) {
+                // Atualiza o ID temporário com o oficial da API
+                ra.publicId = idCru
+                ra = raRepo.save(ra)
+                logger.info("🔄 RA pré-cadastrada '${ra.nome}' atualizada com o ID oficial da CLDF: $idCru")
+            }
+
+            rasSincronizadas.add(ra)
         }
 
-        return listaFinal.toList()
+        return rasSincronizadas
     }
+
+
     // =========================================================================
     // 1. LISTAGEM GERAL
     // =========================================================================
