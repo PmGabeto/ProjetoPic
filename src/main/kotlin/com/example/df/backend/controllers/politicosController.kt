@@ -4,6 +4,7 @@ import com.example.df.backend.dtos.*
 import com.example.df.backend.entities.Politico
 import com.example.df.backend.entities.Proposicao
 import com.example.df.backend.enums.StatusPolitico
+import com.example.df.backend.enums.TipoProjetoLei
 import com.example.df.backend.services.PoliticoService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -12,6 +13,12 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import com.example.df.backend.services.ProposicaoService
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Sort
+import org.springframework.data.web.PageableDefault
+import org.springframework.format.annotation.DateTimeFormat
+import java.time.LocalDate
 
 @Tag(name = "4. Políticos", description = "Gestão de representantes públicos e suas proposições")
 @RestController
@@ -58,5 +65,25 @@ class PoliticoController(
         @RequestBody novoStatus: StatusPolitico // Alterado para Body para evitar ambiguidade
     ): ResponseEntity<Politico> {
         return ResponseEntity.ok(service.alterarStatus(id, novoStatus))
+    }
+    // Em PoliticoController.kt
+    @Operation(summary = "Listar proposições de um político com filtros avançados")
+    @GetMapping("/{id}/proposicoes")
+    fun listarProposicoesDoPolitico(
+        @PathVariable("id") politicoId: Long,
+        @RequestParam(required = false) temaId: Long?,
+        @RequestParam(required = false) raId: Long?,
+        @RequestParam(required = false) tipo: TipoProjetoLei?,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) dataInicio: LocalDate?,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) dataFim: LocalDate?,
+        @PageableDefault(size = 10, sort = ["dataApresentacao"], direction = Sort.Direction.DESC) pageable: Pageable
+
+    ): ResponseEntity<Page<ProposicaoResumoDTO>> {
+
+        val resultado = proposicaoService.listarProposicoesDoPolitico(
+            politicoId, temaId, raId, tipo, dataInicio, dataFim, pageable
+        )
+
+        return ResponseEntity.ok(resultado)
     }
 }

@@ -5,7 +5,9 @@ import jakarta.persistence.*
 import java.time.LocalDate
 
 @Entity
-@Table(name = "PROPOSICAO")
+@Table(name = "PROPOSICAO" , indexes = [
+    Index(name = "idx_proposicao_data", columnList = "DT_APRESENTACAO")
+])
 data class Proposicao(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

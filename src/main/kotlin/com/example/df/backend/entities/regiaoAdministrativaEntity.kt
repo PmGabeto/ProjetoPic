@@ -3,7 +3,9 @@ package com.example.df.backend.entities
 import jakarta.persistence.*
 
 @Entity
-@Table(name = "REGIAO_ADMINISTRATIVA")
+@Table(name = "REGIAO_ADMINISTRATIVA",indexes = [
+    Index(name = "idx_ra_public_id", columnList = "PUBLIC_ID")
+])
 data class RegiaoAdministrativa(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

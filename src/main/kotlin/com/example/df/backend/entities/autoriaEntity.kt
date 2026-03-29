@@ -5,7 +5,9 @@ import jakarta.persistence.*
 import java.io.Serializable
 
 @Entity
-@Table(name = "AUTORIA_PROPOSICAO")
+@Table(name = "AUTORIA_PROPOSICAO", indexes = [
+    Index(name = "idx_autoria_politico", columnList = "ID_POLITICO")
+])
 class Autoria(
 
     @EmbeddedId

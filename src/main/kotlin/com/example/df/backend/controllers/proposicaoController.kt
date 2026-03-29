@@ -16,14 +16,6 @@ class ProposicaoController(
     private val service: ProposicaoService
 ) {
 
-    /**
-     * 1. LISTAGEM GERAL
-     * GET /api/proposicoes
-     */
-    @Operation(summary = "Listar todas as proposições", description = "Retorna a timeline principal para o app.")
-    @GetMapping
-    fun listarTodas(): ResponseEntity<List<ProposicaoResumoDTO>> {
-        return ResponseEntity.ok(service.listarTodas())    }
 
     /**
      * 2. BUSCAR DETALHE

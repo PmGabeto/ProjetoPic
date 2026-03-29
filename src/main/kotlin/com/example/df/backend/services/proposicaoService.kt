@@ -9,6 +9,9 @@ import com.example.df.backend.integrations.cldf.CldfInterface
 import com.example.df.backend.integrations.cldf.ProposicaoCldfBaseDTO
 import com.example.df.backend.repositories.*
 import org.slf4j.LoggerFactory
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
@@ -16,6 +19,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 import org.springframework.scheduling.annotation.Scheduled
+import org.springframework.web.server.ResponseStatusException
 
 @Service
 @Suppress("unused")
@@ -467,31 +471,68 @@ open class ProposicaoService(
     // =========================================================================
     // 1. LISTAGEM GERAL
     // =========================================================================
+    // Em ProposicaoService.kt (ou PoliticoService, dependendo de onde preferir acoplar)
     @Transactional(readOnly = true)
-    fun listarTodas(): List<ProposicaoResumoDTO> {
-        val proposicoes = proposicaoRepo.findAll()
+    fun listarProposicoesDoPolitico(
+        politicoId: Long,
+        temaId: Long?,
+        raId: Long?,
+        tipo: TipoProjetoLei?,
+        dataInicio: LocalDate?,
+        dataFim: LocalDate?,
+        pageable: Pageable
+    ): Page<ProposicaoResumoDTO> {
 
-        return proposicoes.map { p ->
+        // Verifica se o político existe (opcional, dependendo do rigor do seu sistema)
+        if (!politicoRepo.existsById(politicoId)) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Político não encontrado")
+        }
+
+        val proposicoesPage = proposicaoRepo.buscarProposicoesDoPoliticoComFiltros(
+            politicoId = politicoId,
+            temaId = temaId,
+            raId = raId,
+            tipo = tipo,
+            dataInicio = dataInicio,
+            dataFim = dataFim,
+            pageable = pageable
+        )
+
+        // Aqui você chama a sua função/mapper que transforma Entity em Resumo DTO
+        return proposicoesPage.map { p ->
             ProposicaoResumoDTO(
                 id = p.id!!,
                 publicId = p.publicId,
+
                 tipo = TipoProposicaoDTO(
                     sigla = p.tipo.name,
-                    nome = p.tipo.name,
-                    //descricaoPedagogica = "Proposição legislativa"
+                    nome = p.tipo.name
                 ),
-                numero = p.numeroProcesso, // Vindo exato da sua entidade Proposicao
-                titulo = p.titulo,         // Vindo exato da sua entidade Proposicao
+                numero = p.numeroProcesso,
+                titulo = p.titulo,
+                // Transformando a entidade Tema no TemaDTO
+                tema = p.temas.map { t ->
+                    TemaDTO(
+                        id = t.id,
+                        nome = t.nome
+                    )
+                },
+                status = p.statusTramitacao ?: "Sem status",
                 ementa = p.ementa,
-                status = p.statusTramitacao ?: "TRAMITANDO",
-                data = p.dataApresentacao, // LocalDate direto da entidade
-                tema = p.temas.map { TemaDTO(id = it.id, nome = it.nome) }, // 'temas' da entidade
-                linkCompleto = p.linkCompleto,
-                autores = p.autores.map { it.politico.nomeUrna }, // Pega só o nome de cada autor
-                regioesAdministrativas = p.regioesAdministrativas.map { it.nome } // Pega só o nome da RA
+                data = p.dataApresentacao,
+                // Navega pelos autores, acessa a entidade Politico e pega o Nome de Urna (se nulo, pega o Nome Completo)
+                autores = p.autores.map { a ->
+                    a.politico.nomeUrna ?: a.politico.nomeCompleto
+                },
+                // Pega apenas o nome da Região Administrativa
+                regioesAdministrativas = p.regioesAdministrativas.map { ra -> ra.nome },
+
+                linkCompleto = p.linkCompleto
             )
+
         }
     }
+
 
     // =========================================================================
     // 2. BUSCAR DETALHES
