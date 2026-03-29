@@ -37,6 +37,7 @@ open class ProposicaoService(
     @Volatile
     var varreduraAtiva: Boolean = false
     private val politicosPendentesDeCadastro = mutableSetOf<String>()
+    private val rasPendentesDeCadastro = mutableSetOf<String>()
 
     fun pararVarredura() {
         varreduraAtiva = false
@@ -82,7 +83,7 @@ open class ProposicaoService(
     // AGENDAMENTO AUTOMÁTICO (Robô da Madrugada)
     // =========================================================================
 
-    @Scheduled(cron = "0 0 2 * * *", zone = "America/Sao_Paulo")
+    @Scheduled(cron = "0 0 2 * * ?", zone = "America/Sao_Paulo")
     fun sincronizacaoNoturnaAutomatica() {
         if (varreduraAtiva) {
             logger.warn("⚠️ A varredura já está em andamento. Ignorando o agendamento desta noite.")
@@ -146,16 +147,30 @@ open class ProposicaoService(
                 logger.warn("\u001B[41m\u001B[37m\u001B[1m ============================================================================== \u001B[0m")
                 logger.warn("\u001B[41m\u001B[37m\u001B[1m O robô criou perfis básicos baseados nos dados da CLDF.                        \u001B[0m")
                 logger.warn("\u001B[41m\u001B[37m\u001B[1m Favor acessar o painel de administração e completar o cadastro de:             \u001B[0m")
+                if (politicosPendentesDeCadastro.isNotEmpty()) {
+                    logger.warn("\u001B[41m\u001B[37m\u001B[1m                                                                                \u001B[0m")
+                    logger.warn("\u001B[41m\u001B[37m\u001B[1m 👤 POLÍTICOS NOVOS (${politicosPendentesDeCadastro.size}):                                      \u001B[0m")
+                    politicosPendentesDeCadastro.forEach { nomePolitico ->
+                        logger.warn("\u001B[41m\u001B[37m\u001B[1m -> $nomePolitico \u001B[0m")
+                    }
+                }
 
-                politicosPendentesDeCadastro.forEach { nomeAlerta ->
-                    logger.warn("\u001B[41m\u001B[37m\u001B[1m -> $nomeAlerta \u001B[0m")
+                // Lista as Regiões Administrativas (se existirem)
+                if (rasPendentesDeCadastro.isNotEmpty()) {
+                    logger.warn("\u001B[41m\u001B[37m\u001B[1m                                                                                \u001B[0m")
+                    logger.warn("\u001B[41m\u001B[37m\u001B[1m 📍 REGIÕES ADMINISTRATIVAS NOVAS (${rasPendentesDeCadastro.size}):                                \u001B[0m")
+                    rasPendentesDeCadastro.forEach { nomeRa ->
+                        logger.warn("\u001B[41m\u001B[37m\u001B[1m -> $nomeRa \u001B[0m")
+                    }
                 }
 
                 logger.warn("\u001B[41m\u001B[37m\u001B[1m ============================================================================== \u001B[0m\n")
 
-                // Limpa a lista para a próxima madrugada não repetir os nomes velhos
+                // 3. Limpa as listas da memória para a execução do próximo dia não repetir o aviso
                 politicosPendentesDeCadastro.clear()
+                rasPendentesDeCadastro.clear()
             }
+
         }
     }
     // =========================================================================
@@ -233,7 +248,7 @@ open class ProposicaoService(
             val docPublicId = docDto.idArquivo
             if (docPublicId != null && !idsDocsBanco.contains(docPublicId)) {
                 val autorLimpoDoDocumento = docDto.autoria?.replace(
-                    Regex("^(Deputado|Deputada|Pastor|Pastora|Doutor|Doutora|Dr\\.|Dra\\.)\\s+", RegexOption.IGNORE_CASE), ""
+                    Regex("^(Deputado|Deputada)\\s+", RegexOption.IGNORE_CASE), ""
                 )?.trim()
 
                 val doc = DocumentosArquivos(
@@ -254,8 +269,8 @@ open class ProposicaoService(
         }
        // 4. VERIFICA NOVAS REGIÕES ADMINISTRATIVAS
         val rasSincronizadas = processarRasDinamicamente(
-            nomesRas = baseDto.regiaoAdiminstrativaNomeLista ?: emptyList(),
-            idsRas = propCompleta?.regiaoAdministrativa ?: emptyList()
+            nomesRas = baseDto.regiaoAdministrativaNomeLista ?: emptyList(),
+
         )
 
         if (rasSincronizadas.isNotEmpty()) {
@@ -281,8 +296,7 @@ open class ProposicaoService(
         val listaHistorico = detalhes.historico
 
         val rasSincronizadas = processarRasDinamicamente(
-            nomesRas = baseDto.regiaoAdiminstrativaNomeLista,
-            idsRas = propCompleta?.regiaoAdministrativa
+            nomesRas = baseDto.regiaoAdministrativaNomeLista
         )
 
         val proposicao = Proposicao(
@@ -319,7 +333,7 @@ open class ProposicaoService(
                 if (nomeCru.isNullOrBlank()) return@forEach
 
                 val nomeLimpo = nomeCru.replace(
-                    Regex("^(Deputado|Deputada|Pastor|Pastora|Doutor|Doutora|Dr\\.|Dra\\.)\\s+", RegexOption.IGNORE_CASE), ""
+                    Regex("^(Deputado|Deputada)\\s+", RegexOption.IGNORE_CASE), ""
                 ).trim()
 
                 var politico = politicoRepo.findByNomeUrnaContainingIgnoreCase(nomeLimpo).firstOrNull()
@@ -388,7 +402,7 @@ open class ProposicaoService(
         documentosDto.forEach { docDto ->
             val docPublicId = docDto.idArquivo
             val autorLimpoDoDocumento = docDto.autoria?.replace(
-                Regex("^(Deputado|Deputada|Pastor|Pastora|Doutor|Doutora|Dr\\.|Dra\\.)\\s+", RegexOption.IGNORE_CASE), ""
+                Regex("^(Deputado|Deputada)\\s+", RegexOption.IGNORE_CASE), ""
             )?.trim()
 
             if (docPublicId != null) {
@@ -421,41 +435,26 @@ open class ProposicaoService(
     // =========================================================================
     // LÓGICA DINÂMICA DE REGIÕES ADMINISTRATIVAS
     // =========================================================================
-    private fun processarRasDinamicamente(nomesRas: List<String>?, idsRas: List<Int>?): MutableSet<RegiaoAdministrativa> {
+    private fun processarRasDinamicamente(nomesRas: List<String>?): MutableSet<RegiaoAdministrativa> {
         val rasSincronizadas = mutableSetOf<RegiaoAdministrativa>()
 
-        val listaRaNomes = nomesRas ?: emptyList()
-        val listaRaIds = idsRas ?: emptyList()
+        if (nomesRas.isNullOrEmpty()) return rasSincronizadas
 
-        val tamanhoRas = maxOf(listaRaNomes.size, listaRaIds.size)
-
-        for (i in 0 until tamanhoRas) {
-            val nomeCru = listaRaNomes.getOrNull(i)
-            val idCru = listaRaIds.getOrNull(i)?.toString() ?: "SEM_ID_$i"
-
-            // Ignora se não houver nome
-            if (nomeCru.isNullOrBlank()) continue
-
-            // Ignora o Distrito Federal genérico e IDs 0
-            if (nomeCru.contains("DISTRITO FEDERAL", ignoreCase = true) || idCru == "0") {
-                continue
-            }
-
+        nomesRas.forEach { nomeCru ->
+            // A string já chega limpinha do DTO. Só tentamos achar no banco:
             var ra = raRepo.findByNomeContainingIgnoreCase(nomeCru)
 
             if (ra == null) {
-                // Se a CLDF inventar uma RA nova que não estava na sua lista, ele cria.
+                // Muito improvável, mas cria se não existir (AUTO_1, AUTO_2...)
+                val novoIdAuto = "AUTO_${rasPendentesDeCadastro.size + 1}"
                 val novaRa = RegiaoAdministrativa(
                     nome = nomeCru,
-                    publicId = idCru
+                    publicId = novoIdAuto
                 )
                 ra = raRepo.save(novaRa)
-                logger.info("📍 Nova RA cadastrada dinamicamente que não estava na lista: $nomeCru")
-            } else if (ra.publicId?.startsWith("TEMP_") == true || ra.publicId != idCru) {
-                // Atualiza o ID temporário com o oficial da API
-                ra.publicId = idCru
-                ra = raRepo.save(ra)
-                logger.info("🔄 RA pré-cadastrada '${ra.nome}' atualizada com o ID oficial da CLDF: $idCru")
+
+                rasPendentesDeCadastro.add(nomeCru)
+                logger.warn("\u001B[43m\u001B[30m ⚠️ AUTO-CADASTRO: Nova RA identificada na API e criada no banco: '$nomeCru' com ID '$novoIdAuto' \u001B[0m")
             }
 
             rasSincronizadas.add(ra)

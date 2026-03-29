@@ -66,16 +66,18 @@ data class ProposicaoCldfBaseDTO(
     @field:JsonProperty("temaId") val temaId: String? = null,
     @field:JsonProperty("temaNome") val temaNome: String? = null,
     @field:JsonProperty("autoria") val autoria: String? = null,
-    @field:JsonProperty("regiaoAdiminstrativaNome") val regiaoAdiminstrativaNome: String? = null,
+    @field:JsonProperty("regiaoAdministrativaNome") val regiaoAdministrativaNome: String? = null,
 
     ){
     // Funções dinâmicas para limpar as strings de lista que vêm com "#"
     val autoriaLista: List<String>
         get() = autoria?.split(",")?.map { it.trim() } ?: emptyList()
 
-    val regiaoAdiminstrativaNomeLista: List<String>
-        get() = regiaoAdiminstrativaNome?.split("#")?.filter { it.isNotBlank() } ?: emptyList()
-
+    val regiaoAdministrativaNomeLista: List<String>
+        get() = regiaoAdministrativaNome
+            ?.split("#") // Quebra a string onde tem '#'
+            ?.map { it.trim() } // Remove espaços sobrando no começo e no fim de cada pedaço
+            ?.filter { it.isNotBlank() } ?: emptyList() // Ignora pedaços vazios
     val temaIdLista: List<String>
         get() = temaId?.split("#")?.filter { it.isNotBlank() } ?: emptyList()
 

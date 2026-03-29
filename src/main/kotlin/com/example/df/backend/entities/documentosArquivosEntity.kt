@@ -18,7 +18,7 @@ data class DocumentosArquivos(
     @Column(name = "TIPO_DOCUMENTO", nullable = false)
     val tipoDocumento: String, // Ex: "PROJETO_LEI", "CONTRATO_OBRA", "EDITAL"
 
-    @Column(name = "NOME_EXIBICAO", nullable = false)
+    @Column(name = "NOME_EXIBICAO", nullable = false, columnDefinition = "TEXT")
     val nomeExibicao: String, // Nome que o usuário vê
 
     @Column(name = "NOME_STORAGE", nullable = true, unique = true)
