@@ -81,7 +81,7 @@ class PoliticoService(
                 status = prop.statusTramitacao ?: "Aguardando",
                 data = prop.dataApresentacao,
                 numero = prop.numeroProcesso,
-                tipo = TipoProposicaoDTO(prop.tipo.name, prop.tipo.name),
+                tipo = prop.tipo.toDTO(),
                 linkCompleto = prop.linkCompleto,
                 tema = prop.temas.map { TemaDTO(it.id, it.nome) }
             )

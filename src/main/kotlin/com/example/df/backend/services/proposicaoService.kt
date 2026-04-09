@@ -480,6 +480,7 @@ open class ProposicaoService(
         tipo: TipoProjetoLei?,
         dataInicio: LocalDate?,
         dataFim: LocalDate?,
+        numero : String?,
         pageable: Pageable
     ): Page<ProposicaoResumoDTO> {
 
@@ -495,6 +496,7 @@ open class ProposicaoService(
             tipo = tipo,
             dataInicio = dataInicio,
             dataFim = dataFim,
+            numero = numero,
             pageable = pageable
         )
 
@@ -504,10 +506,7 @@ open class ProposicaoService(
                 id = p.id!!,
                 publicId = p.publicId,
 
-                tipo = TipoProposicaoDTO(
-                    sigla = p.tipo.name,
-                    nome = p.tipo.name
-                ),
+                tipo = p.tipo.toDTO(),
                 numero = p.numeroProcesso,
                 titulo = p.titulo,
                 // Transformando a entidade Tema no TemaDTO
@@ -552,11 +551,7 @@ open class ProposicaoService(
         return ProposicaoDetalheDTO(
             id = p.id!!,
             publicId = p.publicId,
-            tipo = TipoProposicaoDTO(
-                sigla = p.tipo.name,
-                nome = p.tipo.name,
-               // descricaoPedagogica = "Proposição legislativa detalhada"
-            ),
+            tipo = p.tipo.toDTO(),
             numeroProcesso = p.numeroProcesso,
             numeroDefinitivo = p.numeroDefinitivo,
             titulo = p.titulo,

@@ -1,5 +1,5 @@
 package com.example.df.backend.dtos
-
+import com.example.df.backend.entities.*
 import java.time.LocalDateTime
 
 // ==========================================
@@ -17,6 +17,25 @@ data class DocumentoResponseDTO(
     val autor: String?,
     val validoDesde :LocalDateTime,
     val siglaUnidadeCriacao :String?
+)
+fun DocumentosArquivos.toDTO() = DocumentoResponseDTO(
+    id = this.id ?: 0L,
+    publicId = this.publicId,
+    tipoRelacionado = this.tipoRelacionado, // Vem direto da sua lógica genérica!
+    nomeExibicao = this.nomeExibicao,
+    tipoDocumento = this.tipoDocumento,
+
+    // Se tiver linkDireto manda ele, senão manda o nomeStorage para a API resolver
+    urlDownload = this.linkDireto ?: this.nomeStorage,
+
+    // Pega o "application/pdf" e extrai só o "pdf"
+    extensao = this.mimeType?.substringAfterLast("/") ?: "pdf",
+
+
+    dataCadastro = this.dataCadastro,
+    autor = this.autor,
+    validoDesde = this.validoDesde,
+    siglaUnidadeCriacao = this.siglaUnidadeCriacao
 )
 
 // ==========================================

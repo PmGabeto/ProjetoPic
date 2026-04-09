@@ -34,7 +34,7 @@ interface ProposicaoRepository : JpaRepository<Proposicao, Long> {
       AND (:tipo IS NULL OR p.tipo = :tipo)
       AND (cast(:dataInicio as date) IS NULL OR p.dataApresentacao >= :dataInicio)
       AND (cast(:dataFim as date) IS NULL OR p.dataApresentacao <= :dataFim)
-""")
+AND (cast(:numero as string) IS NULL OR LOWER(p.numeroDefinitivo) LIKE LOWER(CONCAT('%', cast(:numero as string), '%')) OR LOWER(p.numeroProcesso) LIKE LOWER(CONCAT('%', cast(:numero as string), '%')))""")
     fun buscarProposicoesDoPoliticoComFiltros(
         @Param("politicoId") politicoId: Long,
         @Param("temaId") temaId: Long?,
@@ -42,6 +42,7 @@ interface ProposicaoRepository : JpaRepository<Proposicao, Long> {
         @Param("tipo") tipo: TipoProjetoLei?,
         @Param("dataInicio") dataInicio: LocalDate?,
         @Param("dataFim") dataFim: LocalDate?,
+        @Param ("numero") numero: String?,
         pageable: Pageable
     ): Page<Proposicao>
 }

@@ -76,12 +76,13 @@ class PoliticoController(
         @RequestParam(required = false) tipo: TipoProjetoLei?,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) dataInicio: LocalDate?,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) dataFim: LocalDate?,
+        @RequestParam(required = false) numero:String? ,
         @PageableDefault(size = 10, sort = ["dataApresentacao"], direction = Sort.Direction.DESC) pageable: Pageable
 
     ): ResponseEntity<Page<ProposicaoResumoDTO>> {
 
         val resultado = proposicaoService.listarProposicoesDoPolitico(
-            politicoId, temaId, raId, tipo, dataInicio, dataFim, pageable
+            politicoId, temaId, raId, tipo, dataInicio, dataFim, numero, pageable
         )
 
         return ResponseEntity.ok(resultado)

@@ -45,8 +45,8 @@ enum class TipoProjetoLei(
         "Indicação",
         "Sugestão de atos administrativos ao Poder Executivo (GDF)."
     ),
-    MOC(
-        "MOC",
+    MO(
+        "MO",
         "Moção",
         "Manifestação de protesto, repúdio, apoio ou congratulação."
     );

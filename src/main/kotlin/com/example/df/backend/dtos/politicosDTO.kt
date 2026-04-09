@@ -1,5 +1,6 @@
 package com.example.df.backend.dtos
 
+import com.example.df.backend.entities.*
 import com.example.df.backend.enums.*
 import com.fasterxml.jackson.annotation.JsonProperty
 import io.swagger.v3.oas.annotations.media.Schema
@@ -16,15 +17,18 @@ data class TemaDTO(
     @field:Schema(description = "Nome do Tema", example = "Educação")
     val nome: String
 )
+fun Tema.toDTO() = TemaDTO(
+    id = this.id,
+    nome = this.nome
+)
 @Schema(description = "Resultado da operação de sincronização de temas")
 data class SincronizacaoResponseDTO(
 
     @field:Schema(description = "Mensagem descritiva do status da operação", example = "Sincronização realizada com sucesso.")
     val mensagem: String,
 
-      @field:Schema(description = "Data e hora em que a sincronização foi executada")
+    @field:Schema(description = "Data e hora em que a sincronização foi executada")
     val timestamp: LocalDateTime = LocalDateTime.now()
-
 )
 // Dtos Proposicao
 data class TipoProposicaoDTO(
@@ -32,24 +36,16 @@ data class TipoProposicaoDTO(
     val sigla: String,
     @field:Schema(description = "Nome completo do tipo", example = "Projeto de Lei")
     val nome: String,
-  //  @field:Schema(description = "Explicação fácil para o cidadão", example = "Criação de novas leis para o DF.")
-    // val descricaoPedagogica: String
+   @field:Schema(description = "Explicação fácil para o cidadão", example = "Criação de novas leis para o DF.")
+    val descricaoPedagogica: String
 )
-// Dtos Arquivos Documentos
-data class DocumentoDTO(
-    @field:Schema(description = "ID do documento na CLDF", example = "9876")
-    val publicId:String,
-    @field:Schema(description = "Tipo do Documento", example = "Parecer")
-    val tipo: String,
-    @field:Schema(description = "Data de emissão", example = "2024-02-10")
-    val data: LocalDate?,
-    @field:Schema(description = "Link do PDF", example = "https://cldf.gov.br/doc.pdf")
-    val link: String?,
-    @field:Schema(description = "Autor do documento", example = "Comissão de Justiça")
-    val autor: String?,
-    @field:Schema(description = " sigla de onde foi criado", example = "SELEG")
-    val siglaUnidadeCriacao: String? = null,
+fun TipoProjetoLei.toDTO() = TipoProposicaoDTO(
+    sigla = this.sigla,
+    nome = this.nome,
+    descricaoPedagogica = this.descricaoPedagogica
 )
+
+
 
 data class HistoricoDTO(
     @field:Schema(description = "Data do evento", example = "2024-02-15")
@@ -60,6 +56,12 @@ data class HistoricoDTO(
     val unidadeResponsavel: String?,
     @field:Schema(description = "Descrição da movimentação", example = "Encaminhado para votação.")
     val descricao: String?
+)
+fun ProposicaoHistorico.toDTO() = HistoricoDTO(
+    data = this.dataEvento , // Ajuste conforme os nomes da sua Entity
+    fase = this.faseTramitacao,
+    unidadeResponsavel = this.unidadeResponsavel,
+    descricao = this.descricao
 )
 
 // --- DTOs DE POLÍTICO ---
@@ -80,6 +82,15 @@ data class PoliticoResumoDTO(
     @field:Schema(description = "Foto oficial", example = "https://link.com/foto.jpg")
     val foto: String?
 
+)
+fun Politico.toResumoDTO() = PoliticoResumoDTO(
+    id = this.id!!,
+    publicId = this.publicId ?: "",
+    nome = this.nomeUrna ?: this.nomeCompleto,
+    partido = this.partidoAtual,
+    status = this.status,
+    tipoAutor = this.tipoAutor,
+    foto = this.urlFoto
 )
 
 data class PoliticoDetalheDTO(
@@ -104,7 +115,17 @@ data class PoliticoDetalheDTO(
     @field:Schema(description = "Projetos em autoria", implementation = ProposicaoResumoDTO::class)
     val proposicoes: List<ProposicaoResumoDTO>
 )
-
+fun Politico.toDetalheDTO(proposicoesMapeadas: List<ProposicaoResumoDTO>) = PoliticoDetalheDTO(
+    id = this.id!!,
+    nomeCompleto = this.nomeCompleto,
+    nomeUrna = this.nomeUrna,
+    status = this.status,
+    tipoAutor = this.tipoAutor,
+    partido = this.partidoAtual,
+    foto = this.urlFoto,
+    biografia = this.biografiaResumida,
+    proposicoes = proposicoesMapeadas
+)
 // --- DTOs DE PROPOSIÇÃO (SAÍDA) ---
 
 data class ProposicaoResumoDTO(
@@ -139,6 +160,20 @@ data class ProposicaoResumoDTO(
     val regioesAdministrativas: List<String> = emptyList(),
 
     val linkCompleto: String?
+)
+fun Proposicao.toResumoDTO() = ProposicaoResumoDTO(
+    id = this.id!!,
+    publicId = this.publicId,
+    tipo = this.tipo.toDTO(),
+    numero = this.numeroProcesso,
+    titulo = this.titulo,
+    tema = this.temas.map { it.toDTO() },
+    status = this.statusTramitacao,
+    ementa = this.ementa,
+    data = this.dataApresentacao,
+    autores = this.autores.map { it.politico.nomeUrna ?: it.politico.nomeCompleto },
+    regioesAdministrativas = this.regioesAdministrativas.map { it.nome }, // Assume que RA tem o campo "nome"
+    linkCompleto = this.linkCompleto
 )
 data class ProposicaoDetalheDTO(
     @field:Schema(description = "ID interno da proposição", example = "1")
@@ -180,7 +215,7 @@ data class ProposicaoDetalheDTO(
     @field:Schema(description = "Temas relacionados", implementation = TemaDTO::class)
     val tema: List<TemaDTO>,
 
-    @field:Schema(description = "Documentos oficiais (PDFs, pareceres) anexados ao projeto", implementation = DocumentoDTO::class)
+    @field:Schema(description = "Documentos oficiais (PDFs, pareceres) anexados ao projeto", implementation = DocumentoResponseDTO::class)
     val documentos: List<DocumentoResponseDTO>,
 
     @field:Schema(description = "Histórico de todas as movimentações do projeto", implementation = HistoricoDTO::class)
@@ -191,7 +226,25 @@ data class ProposicaoDetalheDTO(
 
     val linkCompleto: String?
 )
-
+fun Proposicao.toDetalheDTO(documentosMapeados: List<DocumentoResponseDTO> = emptyList()) = ProposicaoDetalheDTO(
+id = this.id!!,
+publicId = this.publicId,
+tipo = this.tipo.toDTO(),
+numeroProcesso = this.numeroProcesso,
+numeroDefinitivo = this.numeroDefinitivo,
+titulo = this.titulo,
+ementa = this.ementa,
+statusTramitacao = this.statusTramitacao,
+regiaoAdministrativa = this.regioesAdministrativas.map { it.nome },
+regimeUrgencia = this.regimeUrgencia,
+dataApresentacao = this.dataApresentacao,
+dataLimite = this.dataLimite,
+tema = this.temas.map { it.toDTO() },
+documentos = documentosMapeados, // <-- Mapeia todos os documentos automaticamente!
+historicos = this.historico.map { it.toDTO() }, // <-- Mapeia todos os históricos automaticamente!
+autores = this.autores.map { it.politico.toResumoDTO() }, // <-- Mapeia os autores automaticamente!
+linkCompleto = this.linkCompleto
+)
 // --- DTOs DE ENTRADA ---
 
 data class CriarPoliticoDTO(
